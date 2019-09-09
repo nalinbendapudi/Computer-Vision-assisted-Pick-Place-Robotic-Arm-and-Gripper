@@ -33,7 +33,7 @@ MAX_Y = 520
 
 """ Serial Port Parameters"""
 BAUDRATE   = 1000000
-DEVICENAME = "/dev/ttyACM0".encode('utf-8')
+DEVICENAME = "/dev/ttyACM1".encode('utf-8')
 
 """Threads"""
 class VideoThread(QThread):
@@ -130,6 +130,8 @@ class Gui(QMainWindow):
         self.ui.chk_directcontrol.stateChanged.connect(self.directControlChk)
         self.ui.rdoutStatus.setText("Waiting for input")
 
+        self.ui.btn_exec.clicked.connect(self.execute)
+
         """initalize manual control off"""
         self.ui.SliderFrame.setEnabled(False)
 
@@ -202,6 +204,10 @@ class Gui(QMainWindow):
     def estop(self):
         self.rexarm.estop = True
         self.sm.set_next_state("estop")
+
+    def execute(self):
+        print('Hit Execute Button!!')
+        self.sm.set_next_state("execute")
 
     def sliderChange(self):
         """ 

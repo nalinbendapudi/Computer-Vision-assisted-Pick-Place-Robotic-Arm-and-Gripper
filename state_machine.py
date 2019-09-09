@@ -38,6 +38,8 @@ class StateMachine():
                 self.estop()
             if(self.next_state == "calibrate"):
                 self.calibrate()
+            if(self.next_state == "execute"):
+                self.execute()
                 
         if(self.current_state == "estop"):
             self.next_state = "estop"
@@ -46,10 +48,26 @@ class StateMachine():
         if(self.current_state == "calibrate"):
             if(self.next_state == "idle"):
                 self.idle()
+
+        if(self.current_state == "execute"):
+            if(self.next_state == "estop"):
+                self.estop()
                
 
     """Functions run for each state"""
-
+    def execute(self):
+        self.status_message = "State: Execute - task 1.2"
+        self.current_state = "execute"
+        poses = [[ 0.0, 0.0, 0.0, 0.0, 0.0],
+        [ 1.0, 0.8, 1.0, 0.5, 1.0],
+        [-1.0,-0.8,-1.0,-0.5, -1.0],
+        [-1.0, 0.8, 1.0, 0.5, 1.0],
+        [1.0, -0.8,-1.0,-0.5, -1.0],
+        [ 0.0, 0.0, 0.0, 0.0, 0.0]]
+        for pose in poses:
+            self.rexarm.set_positions(pose)
+            self.rexarm.pause(1)
+        self.next_state = "idle"
 
     def manual(self):
         self.status_message = "State: Manual - Use sliders to control arm"
