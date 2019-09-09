@@ -2,6 +2,8 @@
 import numpy as np
 from kinematics import *
 import time
+import copy
+import math
 
 """ 
 TODO:
@@ -70,7 +72,7 @@ class Rexarm():
         pass
 
     def set_positions(self, joint_angles, update_now = True):
-        self.clamp(joint_angles)
+        joint_angles = self.clamp(joint_angles)
         for i,joint in enumerate(self.joints):
             self.position[i] = joint_angles[i]
             if(update_now):
@@ -158,7 +160,12 @@ class Rexarm():
 
     def clamp(self, joint_angles):
         """TODO"""
-        pass
+        output = []
+        min_value = np.array([-180, -120, -115, -180, -125, -180])/180.0*math.pi
+        max_value = np.array([180, 110, 100, 180, 120, 180])/180.0*math.pi
+        for angle, min_v, max_v in zip(joint_angles, min_value, max_value):
+            output.append(max(min_v, min(max_v, angle)))
+        return output
 
     def get_wrist_pose(self):
         """TODO"""
