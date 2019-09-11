@@ -17,8 +17,8 @@ class Kinect():
         self.kinectCalibrated = False
         self.last_click = np.array([0,0])
         self.new_click = False
-        self.rgb_click_points = np.zeros((5,2),int)
-        self.depth_click_points = np.zeros((5,2),int)
+        self.rgb_click_points = np.zeros((4,2),int)
+        self.depth_click_points = np.zeros((4,2),int)
 
         """ Extra arrays for colormaping the depth image"""
         self.DepthHSV = np.zeros((480,640,3)).astype(np.uint8)

@@ -159,10 +159,9 @@ class StateMachine():
         location_strings = ["lower left corner of board",
                             "upper left corner of board",
                             "upper right corner of board",
-                            "lower right corner of board",
-                            "center of shoulder motor"]
+                            "lower right corner of board"]
         i = 0
-        for j in range(5):
+        for j in range(4):
             self.status_message = "Calibration - Click %s in RGB image" % location_strings[j]
             while (i <= j):
                 self.rexarm.get_feedback()
@@ -172,7 +171,7 @@ class StateMachine():
                     self.kinect.new_click = False        
         
         i = 0
-        for j in range(5):
+        for j in range(4):
             self.status_message = "Calibration - Click %s in depth image" % location_strings[j]
             while (i <= j):
                 self.rexarm.get_feedback()
@@ -185,6 +184,14 @@ class StateMachine():
         print(self.kinect.depth_click_points)
 
         """TODO Perform camera calibration here"""
+        world_points = [[0, 0, 1], [0, 85.9, 1], [85.9, 85.9, 1], [85.9, 0, 1]]
+        A = []
+        for world, cam in zip(world_points, self.kinect.rgb_click_points):
+            A.append([0,0,0,cam[0],cam[1],cam[2],1,-world[1]*cam[0],-world[1]*cam[1],-world[1]*cam[2]])
+            A.append([cam[0],cam[1],cam[2],0,0,0,1,-world[0]*cam[0],-world[0]*cam[1],-world[0]*cam[2]])
+        A = np.array(A)
+        # A.T@A
+
 
         self.status_message = "Calibration - Completed Calibration"
         time.sleep(1)
