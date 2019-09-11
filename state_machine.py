@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import copy
 
 """
 TODO: Add states and state functions to this class
@@ -40,6 +41,10 @@ class StateMachine():
                 self.calibrate()
             if(self.next_state == "execute"):
                 self.execute()
+            if (self.next_state == "record_next"):
+                self.start_record()
+            if (self.next_state == "replay"):
+                self.replay()
                 
         if(self.current_state == "estop"):
             self.next_state = "estop"
@@ -52,7 +57,21 @@ class StateMachine():
         if(self.current_state == "execute"):
             if(self.next_state == "estop"):
                 self.estop()
-               
+            if(self.next_state == "idle"):
+                self.idle()
+
+        if (self.current_state == "recording"):
+            if (self.next_state == "finish"):
+                self.finish_record()
+            if (self.next_state == "record_next"):
+                self.record_next()
+            if (self.next_state == "estop"):
+                self.estop()
+        
+        if self.current_state == "replay":
+            if (self.next_state == "estop"):
+                self.estop()
+            
 
     """Functions run for each state"""
     def execute(self):
@@ -85,7 +104,54 @@ class StateMachine():
         self.current_state = "estop"
         self.rexarm.disable_torque()
         self.rexarm.get_feedback()
+    
+    def start_record(self):
+        self.status_message = "Start recording"
+        self.current_state = "recording"
+        self.next_state = "recording"
+        self.rexarm.disable_torque()
+        self.rexarm.get_feedback()
+        self.history = []
+        self.history.append([ 0.0, 0.0, 0.0, 0.0, 0.0])
+
+    def record_next(self):
+        '''
+        record current position, change state to recording
+        '''
+        self.history.append(copy.deepcopy(self.rexarm.get_positions()))
+        self.next_state = "recording"
+        print(self.history)
+
+    def finish_record(self):
+        '''
+        resume torque, change state to idle
+        '''
+        self.history.append([ 0.0, 0.0, 0.0, 0.0, 0.0])
+        self.rexarm.enable_torque()
+        self.current_state = "idle"
+        self.next_state = "idle"
+        np.savetxt("history.csv", np.array(self.history), delimiter=",")
+
+    def replay(self):
+        '''
+        replay history if it exists, change state to idle
+        '''
+        print("Warining: replaying")
+        if self.history is None:
+            print('Error: Please start recording first')
+            self.next_state = "idle"
+            return
+        self.current_state = "replay"
+        for pose in self.history:
+            print(pose)
+            self.rexarm.set_positions(pose)
+            self.rexarm.pause(1)
+        print("finish replaying")
+        self.next_state = "idle"
+        self.idle()
         
+
+
     def calibrate(self):
         self.current_state = "calibrate"
         self.next_state = "idle"

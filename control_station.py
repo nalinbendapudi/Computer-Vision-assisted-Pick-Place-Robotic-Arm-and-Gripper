@@ -130,7 +130,18 @@ class Gui(QMainWindow):
         self.ui.chk_directcontrol.stateChanged.connect(self.directControlChk)
         self.ui.rdoutStatus.setText("Waiting for input")
 
+        self.ui.btn_task1.setText("RECORD")
+        self.ui.btn_task2.setText("STOP Recording")
+        self.ui.btn_task2.setDisabled(True)
+        self.ui.btn_task3.setText("REPLAY")
+        self.ui.btn_task3.setDisabled(True)
+
+
         self.ui.btn_exec.clicked.connect(self.execute)
+
+        self.ui.btn_task1.clicked.connect(self.record)
+        self.ui.btn_task2.clicked.connect(self.stop_record)
+        self.ui.btn_task3.clicked.connect(self.replay)
 
         """initalize manual control off"""
         self.ui.SliderFrame.setEnabled(False)
@@ -208,6 +219,24 @@ class Gui(QMainWindow):
     def execute(self):
         print('Hit Execute Button!!')
         self.sm.set_next_state("execute")
+
+    def record(self):
+        print('Hit record Button!!')
+        self.ui.btn_task1.setText("Record next")
+        self.ui.btn_task2.setEnabled(True)
+        self.sm.set_next_state("record_next")
+    
+    def stop_record(self):
+        print('Hit stop record Button!!')
+        self.ui.btn_task2.setDisabled(True)
+        self.sm.set_next_state("finish")
+        self.ui.btn_task3.setEnabled(True)
+        self.ui.btn_task1.setText("RECORD")
+
+    
+    def replay(self):
+        print('Hit replay Button!!')
+        self.sm.set_next_state("replay")
 
     def sliderChange(self):
         """ 
