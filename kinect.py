@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from PyQt4.QtGui import QImage
 import freenect
-
+import os
 class Kinect():
     def __init__(self):
         self.currentVideoFrame = np.array([])
@@ -131,14 +131,18 @@ class Kinect():
         TODO:
         Using an Affine transformation, transform the depth frame to match the RGB frame
         """
-        pass
+        transformed = cv2.warpAffine(frame, M = self.depth2rgb_affine, dsize = (frame.shape[1],frame.shape[0]))
+        return transformed
 
     def loadCameraCalibration(self):
         """
         TODO:
         Load camera intrinsic matrix from file.
         """
-        pass
+        if not os.path.exists('util/calibration.csv'):
+            print('No calibration file found')
+            raise NotImplementedError
+        return np.loadtxt('util/calibration.csv', delimiter=',')
     
     def blockDetector(self):
         """

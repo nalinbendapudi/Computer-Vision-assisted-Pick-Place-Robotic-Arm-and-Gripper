@@ -97,7 +97,8 @@ if __name__ == '__main__':
     f.write("\r\ndistortion coefficients:\r\n")
     f.write(str( dist_coefs.ravel()))
     f.close()
-    
+    np.savetxt('calibration.csv', camera_matrix, delimiter=',')
+
     
     # Use new calibration to undistort camera feed, exit on ESC
     new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix,dist_coefs,(w,h),1,(w,h))

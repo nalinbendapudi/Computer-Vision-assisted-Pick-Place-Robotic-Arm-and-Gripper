@@ -286,18 +286,13 @@ class Gui(QMainWindow):
             x = x - MIN_X
             y = y - MIN_Y
             if(self.kinect.currentDepthFrame.any() != 0):
-                p_w = np.matmul(self.sm.rgb2world, np.array([[x],[y],[1]]))
-                
-                p_d = np.matmul(self.sm.world2depth, np.array([p_w[0],[p_w[1]],[1]])).reshape(-1)
-                y_max, x_max = self.kinect.currentDepthFrame.shape
-                if int(p_d[1]) >= y_max or int(p_d[0]) >= x_max or int(p_d[0]) < 0 or int(p_d[1]) < 0:
-                    z = -1
-                else:
-                    d = self.kinect.currentDepthFrame[int(p_d[1])][int(p_d[0])]
-                    print(d)
-                    z = 0.1236 * np.tan(d/2842.5 + 1.1863)
+                d = self.kinect.currentDepthFrame[y][x]
+                z = 0.1236 * np.tan(d/2842.5 + 1.1863)*1000
+                p_c = np.matmul(np.linalg.inv(self.sm.intrinsic), z*np.array([[x],[y],[1]])).reshape(-1)
+                p_w = np.matmul(self.sm.cam2world,  np.array([[p_c[0]], [p_c[1]], [1]]))
+
                 self.ui.rdoutMousePixels.setText("(%.0f,%.0f,%.0f)" % (x,y,z))
-                self.ui.rdoutMouseWorld.setText("(%.0f,%.0f,%.0f)" % (p_w[0],p_w[1],z))
+                self.ui.rdoutMouseWorld.setText("(%.0f,%.0f,%.0f)" % (p_w[0],p_w[1],self.sm.z_reference-z))
 
     def mousePressEvent(self, QMouseEvent):
         """ 

@@ -14,9 +14,9 @@ class StateMachine():
         self.status_message = "State: Idle"
         self.current_state = "idle"
         self.next_state = "idle"
-        self.rgb2world = np.array([[1,0,0],[0,1,0]])
-        self.world2depth = np.array([[1,0,0],[0,1,0]])
-
+        self.intrinsic = np.eye(3)
+        self.cam2world = np.array([[1, 0, 0],[0, 1, 0]])
+        self.z_reference = 940
 
     def set_next_state(self, state):
         self.next_state = state
@@ -158,6 +158,7 @@ class StateMachine():
         self.current_state = "calibrate"
         self.next_state = "idle"
         self.tp.go(max_speed=2.0)
+        self.intrinsic = self.kinect.loadCameraCalibration()
         location_strings = ["lower left corner of board",
                             "upper left corner of board",
                             "upper right corner of board",
@@ -183,12 +184,25 @@ class StateMachine():
                     self.kinect.new_click = False
 
         """TODO Perform camera calibration here"""
-        world_points = [[0, 0, 1], [0, 859, 1], [859, 859, 1], [859, 0, 1]]
-        self.rgb2world = self.kinect.getAffineTransform(self.kinect.rgb_click_points, world_points)
-        self.world2depth = self.kinect.getAffineTransform(world_points, self.kinect.depth_click_points)
-        
-        print('world2depth\n',self.world2depth)
-        print('rgb2world\n',self.rgb2world)
+        self.kinect.depth2rgb_affine = self.kinect.getAffineTransform(self.kinect.depth_click_points, self.kinect.rgb_click_points)
+        print('depth2rgb_affine\n',self.kinect.depth2rgb_affine)
+        world_points = np.array([[0, 0, 1], [0, 615, 1], [615, 615, 1], [615, 0, 1]])
+        p_cam = []
+        for pt in self.kinect.rgb_click_points:
+            p_cam.append(self.z_reference*np.matmul(np.linalg.inv(self.intrinsic), np.array([[pt[0]],[pt[1]], [1]])).reshape(-1))
+        p_cam = np.array(p_cam)
+        print(p_cam)
+        print(np.linalg.norm(p_cam[0]-p_cam[1]))
+        print(np.linalg.norm(p_cam[1]-p_cam[2]))
+        print(np.linalg.norm(p_cam[2]-p_cam[3]))
+        print(np.linalg.norm(p_cam[0]-p_cam[3]))
+        self.cam2world = self.kinect.getAffineTransform(p_cam, world_points)
+        print('cam2world\n',self.cam2world)
+        for ptc, ptw in zip(p_cam[:,:2], world_points[:,:2]):
+            print(ptc, ptw)
+            print('transformed',np.matmul(self.cam2world, np.array([[ptc[0]], [ptc[1]], [1]])))
+            print('residence',np.linalg.norm(np.matmul(self.cam2world, np.array([[ptc[0]], [ptc[1]], [1]])).reshape(-1)- ptw))
+        self.kinect.kinectCalibrated = True
 
 
         self.status_message = "Calibration - Completed Calibration"
