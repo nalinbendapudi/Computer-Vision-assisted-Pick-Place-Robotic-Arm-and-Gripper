@@ -14,12 +14,14 @@ class StateMachine():
         self.status_message = "State: Idle"
         self.current_state = "idle"
         self.next_state = "idle"
+        self.rgb2world = np.array([[1,0,0],[0,1,0]])
+        self.world2depth = np.array([[1,0,0],[0,1,0]])
 
 
     def set_next_state(self, state):
         self.next_state = state
 
-    """ This function is run continuously in a thread"""
+    """ This function is run continuously icoordinatesn a thread"""
 
     def run(self):
         if(self.current_state == "manual"):
@@ -179,18 +181,14 @@ class StateMachine():
                     self.kinect.depth_click_points[i] = self.kinect.last_click.copy()
                     i = i + 1
                     self.kinect.new_click = False
-   
-        print(self.kinect.rgb_click_points)
-        print(self.kinect.depth_click_points)
 
         """TODO Perform camera calibration here"""
-        world_points = [[0, 0, 1], [0, 85.9, 1], [85.9, 85.9, 1], [85.9, 0, 1]]
-        A = []
-        for world, cam in zip(world_points, self.kinect.rgb_click_points):
-            A.append([0,0,0,cam[0],cam[1],cam[2],1,-world[1]*cam[0],-world[1]*cam[1],-world[1]*cam[2]])
-            A.append([cam[0],cam[1],cam[2],0,0,0,1,-world[0]*cam[0],-world[0]*cam[1],-world[0]*cam[2]])
-        A = np.array(A)
-        # A.T@A
+        world_points = [[0, 0, 1], [0, 859, 1], [859, 859, 1], [859, 0, 1]]
+        self.rgb2world = self.kinect.getAffineTransform(self.kinect.rgb_click_points, world_points)
+        self.world2depth = self.kinect.getAffineTransform(world_points, self.kinect.depth_click_points)
+        
+        print('world2depth\n',self.world2depth)
+        print('rgb2world\n',self.rgb2world)
 
 
         self.status_message = "Calibration - Completed Calibration"

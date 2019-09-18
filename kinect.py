@@ -105,13 +105,25 @@ class Kinect():
         Given 2 sets of corresponding coordinates, 
         find the affine matrix transform between them.
 
+        W = M*C
+        coord1 in camera frame, coord2 in world frame
+        return affine transformation from camera to world frame
+
         TODO: Rewrite this function to take in an arbitrary number of coordinates and 
         find the transform without using cv2 functions
         """
-        pts1 = coord1[0:3].astype(np.float32)
-        pts2 = coord2[0:3].astype(np.float32)
-        print(cv2.getAffineTransform(pts1,pts2))
-        return cv2.getAffineTransform(pts1,pts2)
+        C = []
+        W = []
+        for pt1, pt2 in zip(coord1, coord2):
+            C.append([pt1[0],pt1[1], 1, 0, 0,0])
+            C.append([0,0,0,pt1[0],pt1[1],1])
+            W.append([pt2[0]])
+            W.append([pt2[1]])
+        C = np.array(C)
+        W = np.array(W)
+        M = np.matmul(np.matmul(np.linalg.inv(np.matmul(C.T,C)),C.T),W)
+        M = M.reshape((2,3))
+        return M
 
 
     def registerDepthFrame(self, frame):

@@ -33,7 +33,7 @@ MAX_Y = 520
 
 """ Serial Port Parameters"""
 BAUDRATE   = 1000000
-DEVICENAME = "/dev/ttyACM1".encode('utf-8')
+DEVICENAME = "/dev/ttyACM0".encode('utf-8')
 
 """Threads"""
 class VideoThread(QThread):
@@ -286,9 +286,18 @@ class Gui(QMainWindow):
             x = x - MIN_X
             y = y - MIN_Y
             if(self.kinect.currentDepthFrame.any() != 0):
-                z = self.kinect.currentDepthFrame[y][x]
+                p_w = np.matmul(self.sm.rgb2world, np.array([[x],[y],[1]]))
+                
+                p_d = np.matmul(self.sm.world2depth, np.array([p_w[0],[p_w[1]],[1]])).reshape(-1)
+                y_max, x_max = self.kinect.currentDepthFrame.shape
+                if int(p_d[1]) >= y_max or int(p_d[0]) >= x_max or int(p_d[0]) < 0 or int(p_d[1]) < 0:
+                    z = -1
+                else:
+                    d = self.kinect.currentDepthFrame[int(p_d[1])][int(p_d[0])]
+                    print(d)
+                    z = 0.1236 * np.tan(d/2842.5 + 1.1863)
                 self.ui.rdoutMousePixels.setText("(%.0f,%.0f,%.0f)" % (x,y,z))
-                self.ui.rdoutMouseWorld.setText("(-,-,-)")
+                self.ui.rdoutMouseWorld.setText("(%.0f,%.0f,%.0f)" % (p_w[0],p_w[1],z))
 
     def mousePressEvent(self, QMouseEvent):
         """ 
