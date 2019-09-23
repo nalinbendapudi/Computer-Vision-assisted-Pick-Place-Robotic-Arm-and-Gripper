@@ -8,6 +8,71 @@ There are some functions to start with, you may need to implement a few more
 
 """
 
+LS = np.array([122.43,110.02,121.7,118.48])
+
+# Checks if a matrix is a valid rotation matrix.
+def _isRotationMatrix(R):
+    Rt = np.transpose(R)
+    shouldBeIdentity = np.dot(Rt, R)
+    I = np.identity(3, dtype = R.dtype)
+    n = np.linalg.norm(I - shouldBeIdentity)
+    return n < 1e-6
+ 
+ 
+# Calculates rotation matrix to euler angles
+# The result is the same as MATLAB except the order
+# of the euler angles ( x and z are swapped ).
+def _rotationMatrixToEulerAngles(R) :
+ 
+    assert(_isRotationMatrix(R))
+     
+    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+     
+    singular = sy < 1e-6
+ 
+    if  not singular :
+        x = math.atan2(R[2,1] , R[2,2])
+        y = math.atan2(-R[2,0], sy)
+        z = math.atan2(R[1,0], R[0,0])
+    else :
+        x = math.atan2(-R[1,2], R[1,1])
+        y = math.atan2(-R[2,0], sy)
+        z = 0
+ 
+    return np.array([x, y, z])
+
+def matrix_to_trans_euler(matrix):
+    assert(matrix.shape==(4,4))
+    return matrix[:3, 3].reshape(-1), _rotationMatrixToEulerAngles(matrix[:3,:3])
+
+def dh2matrix(joint_angles, link_id):
+    '''
+    INPUT: link id
+    OUTPUT: transformation matrix
+    '''
+    print(len(joint_angles)>=link_id)
+    DH_TABLE = np.array([
+        [joint_angles[0],   LS[0],      0,      -np.pi/2],
+        [joint_angles[1],   0    ,  LS[1],             0],
+        [joint_angles[2],   0    ,      0,       np.pi/2],
+        [joint_angles[3],   LS[2],      0,      -np.pi/2],
+        [joint_angles[4],   0    ,      0,       np.pi/2],
+        [joint_angles[5],   LS[3],      0,             0],
+    ])
+    a, alpha, d, theta = DH_TABLE[link_id]
+    return np.array([[np.cos(theta), -np.sin(theta)*np.cos(alpha), np.sin(theta)*np.sin(alpha), a*np.cos(theta)],
+                    [np.sin(theta), np.cos(theta)*np.cos(alpha), -np.cos(theta)*np.sin(alpha), a*np.sin(theta)],
+                    [0            , np.sin(alpha)               , np.cos(alpha)              , d              ],
+                    [0            , 0                           , 0                          , 1              ]])
+
+
+
+def get_transformation(joint_angles, target = 6, base = 1):
+    rtn = np.eye(4)
+    for link_id in np.arange(base, target):
+        rtn = dh2matrix(joint_angles, link_id)*rtn
+    return rtn
+
 def FK_dh(joint_angles, link):
     """
     TODO: implement this function

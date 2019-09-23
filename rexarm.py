@@ -28,10 +28,11 @@ class Rexarm():
         """TODO: Find the physical angle limits of the Rexarm. Remember to keep track of this if you include more motors"""
         self.angle_limits = np.array([
                             [-180, 179.99],
+                            [-120, 110   ],
+                            [-115, 100   ],
                             [-180, 179.99],
-                            [-180, 179.99],
-                            [-180, 179.99],
-                            [-180, 179.99],], dtype=np.float)*D2R
+                            [-125, 120   ],
+                            [-180, 179.99]], dtype=np.float)*D2R
 
         """ Commanded Values """
         self.num_joints = len(joints)
@@ -161,12 +162,13 @@ class Rexarm():
     def clamp(self, joint_angles):
         """TODO"""
         output = []
-        min_value = np.array([-180, -120, -115, -180, -125, -180])/180.0*math.pi
-        max_value = np.array([180, 110, 100, 180, 120, 180])/180.0*math.pi
-        for angle, min_v, max_v in zip(joint_angles, min_value, max_value):
+        for angle, min_max_v in zip(joint_angles, self.angle_limits):
+            min_v = min_max_v[0]
+            max_v = min_max_v[1]
             output.append(max(min_v, min(max_v, angle)))
         return output
 
     def get_wrist_pose(self):
         """TODO"""
-        return [0,0,0,0,0,0]
+        
+        return matrix_to_trans_euler(get_transformation(self.joint_angles_fb, target=5))

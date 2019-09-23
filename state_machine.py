@@ -186,7 +186,7 @@ class StateMachine():
         """TODO Perform camera calibration here"""
         self.kinect.depth2rgb_affine = self.kinect.getAffineTransform(self.kinect.depth_click_points, self.kinect.rgb_click_points)
         print('depth2rgb_affine\n',self.kinect.depth2rgb_affine)
-        world_points = np.array([[0, 0, 1], [0, 615, 1], [615, 615, 1], [615, 0, 1]])
+        world_points = np.array([[-307, -307, 1], [-307, 307, 1], [307, 307, 1], [307, -307, 1]])
         p_cam = []
         for pt in self.kinect.rgb_click_points:
             p_cam.append(self.z_reference*np.matmul(np.linalg.inv(self.intrinsic), np.array([[pt[0]],[pt[1]], [1]])).reshape(-1))
