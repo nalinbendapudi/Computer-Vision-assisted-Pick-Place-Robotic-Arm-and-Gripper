@@ -171,5 +171,5 @@ class Rexarm():
 
     def get_wrist_pose(self):
         """TODO"""
-        
-        return matrix_to_trans_euler(get_transformation(self.joint_angles_fb, target=5))
+        transformation = get_transformation(self.joint_angles_fb, target=6)
+        return matrix_to_trans_euler(transformation)

@@ -195,7 +195,7 @@ class Gui(QMainWindow):
     @pyqtSlot(list)
     def updateJointReadout(self, joints):
         self.ui.rdoutBaseJC.setText(str("%+.2f" % (joints[0]*R2D)))
-        self.ui.rdoutShoulderJC.setText(str("%+.2f" % ((joints[1]*R2D)+90.0)))
+        self.ui.rdoutShoulderJC.setText(str("%+.2f" % ((joints[1]*R2D))))
         self.ui.rdoutElbowJC.setText(str("%+.2f" % (joints[2]*R2D)))
         self.ui.rdoutWristJC.setText(str("%+.2f" % (joints[3]*R2D)))
         self.ui.rdoutWrist2JC.setText(str("%+.2f" % (joints[4]*R2D)))

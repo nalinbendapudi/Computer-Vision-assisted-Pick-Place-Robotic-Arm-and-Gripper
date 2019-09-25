@@ -38,8 +38,6 @@ def _rotationMatrixToEulerAngles(R) :
         x = math.atan2(-R[1,2], R[1,1])
         y = math.atan2(-R[2,0], sy)
         z = 0
- 
-    # import pdb;pdb.set_trace()
     return np.array([x, y, z])
 
 def matrix_to_trans_euler(matrix):
@@ -54,13 +52,13 @@ def dh2matrix(joint_angles, link_id):
     assert(len(joint_angles)>=link_id)
     DH_TABLE = np.array([
         [joint_angles[0],   LS[0],      0,      -np.pi/2],
-        [joint_angles[1],   0    ,  LS[1],             0],
-        [joint_angles[2],   0    ,      0,       np.pi/2],
+        [joint_angles[1]-np.pi/2,   0    ,  LS[1],             0],
+        [joint_angles[2]+np.pi/2,   0    ,      0,       np.pi/2],
         [joint_angles[3],   LS[2],      0,      -np.pi/2],
         [joint_angles[4],   0    ,      0,       np.pi/2],
         [joint_angles[5],   LS[3],      0,             0],
     ])
-    a, alpha, d, theta = DH_TABLE[link_id]
+    theta, d, a, alpha = DH_TABLE[link_id]
     m =  np.array([[np.cos(theta), -np.sin(theta)*np.cos(alpha), np.sin(theta)*np.sin(alpha), a*np.cos(theta)],
                     [np.sin(theta), np.cos(theta)*np.cos(alpha), -np.cos(theta)*np.sin(alpha), a*np.sin(theta)],
                     [0            , np.sin(alpha)               , np.cos(alpha)              , d              ],
@@ -72,8 +70,8 @@ def dh2matrix(joint_angles, link_id):
 
 def get_transformation(joint_angles, target = 6, base = 0):
     rtn = np.eye(4)
-    for link_id in np.arange(base, target): # [0,1,2,3,4,5]
-        rtn = np.matmul(dh2matrix(joint_angles, link_id), rtn)
+    for link_id in np.arange(base, target):
+        rtn = np.matmul(rtn, dh2matrix(joint_angles, link_id))
 
         if not _isRotationMatrix(rtn[:3,:3]):
             raise AssertionError("Product matrix is invalid")
