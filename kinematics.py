@@ -1,4 +1,5 @@
 import numpy as np
+import math
 #expm is a matrix exponential function
 from scipy.linalg import expm
 
@@ -8,7 +9,7 @@ There are some functions to start with, you may need to implement a few more
 
 """
 
-LS = np.array([122.43,110.02,121.7,118.48])
+LS = np.array([122.43, 110.02, 121.7, 118.48])
 
 # Checks if a matrix is a valid rotation matrix.
 def _isRotationMatrix(R):
@@ -23,7 +24,6 @@ def _isRotationMatrix(R):
 # The result is the same as MATLAB except the order
 # of the euler angles ( x and z are swapped ).
 def _rotationMatrixToEulerAngles(R) :
- 
     assert(_isRotationMatrix(R))
      
     sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
@@ -39,18 +39,19 @@ def _rotationMatrixToEulerAngles(R) :
         y = math.atan2(-R[2,0], sy)
         z = 0
  
+    # import pdb;pdb.set_trace()
     return np.array([x, y, z])
 
 def matrix_to_trans_euler(matrix):
     assert(matrix.shape==(4,4))
-    return matrix[:3, 3].reshape(-1), _rotationMatrixToEulerAngles(matrix[:3,:3])
+    return list(np.append(matrix[:3, 3].reshape(-1), _rotationMatrixToEulerAngles(matrix[:3,:3])))
 
 def dh2matrix(joint_angles, link_id):
     '''
     INPUT: link id
     OUTPUT: transformation matrix
     '''
-    print(len(joint_angles)>=link_id)
+    assert(len(joint_angles)>=link_id)
     DH_TABLE = np.array([
         [joint_angles[0],   LS[0],      0,      -np.pi/2],
         [joint_angles[1],   0    ,  LS[1],             0],
@@ -60,17 +61,22 @@ def dh2matrix(joint_angles, link_id):
         [joint_angles[5],   LS[3],      0,             0],
     ])
     a, alpha, d, theta = DH_TABLE[link_id]
-    return np.array([[np.cos(theta), -np.sin(theta)*np.cos(alpha), np.sin(theta)*np.sin(alpha), a*np.cos(theta)],
+    m =  np.array([[np.cos(theta), -np.sin(theta)*np.cos(alpha), np.sin(theta)*np.sin(alpha), a*np.cos(theta)],
                     [np.sin(theta), np.cos(theta)*np.cos(alpha), -np.cos(theta)*np.sin(alpha), a*np.sin(theta)],
                     [0            , np.sin(alpha)               , np.cos(alpha)              , d              ],
                     [0            , 0                           , 0                          , 1              ]])
+    if not (_isRotationMatrix(m[:3,:3])):
+        raise AssertionError(str(link_id) + " matrix is invalid")
+    return m
 
 
-
-def get_transformation(joint_angles, target = 6, base = 1):
+def get_transformation(joint_angles, target = 6, base = 0):
     rtn = np.eye(4)
-    for link_id in np.arange(base, target):
-        rtn = dh2matrix(joint_angles, link_id)*rtn
+    for link_id in np.arange(base, target): # [0,1,2,3,4,5]
+        rtn = np.matmul(dh2matrix(joint_angles, link_id), rtn)
+
+        if not _isRotationMatrix(rtn[:3,:3]):
+            raise AssertionError("Product matrix is invalid")
     return rtn
 
 def FK_dh(joint_angles, link):
