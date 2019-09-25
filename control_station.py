@@ -34,6 +34,7 @@ MAX_Y = 520
 """ Serial Port Parameters"""
 BAUDRATE   = 1000000
 DEVICENAME = "/dev/ttyACM0".encode('utf-8')
+DEVICENAME_bkup = "/dev/ttyACM1".encode('utf-8')
 
 """Threads"""
 class VideoThread(QThread):
@@ -97,17 +98,22 @@ class Gui(QMainWindow):
         """
         Dynamixel bus
         TODO: add other motors here as needed with their correct address"""
-        self.dxlbus = DXL_BUS(DEVICENAME, BAUDRATE)
+        try:
+            self.dxlbus = DXL_BUS(DEVICENAME, BAUDRATE)
+        except:
+            self.dxlbus = DXL_BUS(DEVICENAME_bkup, BAUDRATE)
         port_num = self.dxlbus.port()
         base = DXL_MX(port_num, 1)
         shld = DXL_MX(port_num, 2)
         elbw = DXL_MX(port_num, 3)
         wrst = DXL_AX(port_num, 4)
         wrst2 = DXL_AX(port_num, 5)
+        wrst3 = DXL_XL(port_num, 6)
+        grip1 = DXL_XL(port_num, 7)
 
         """Objects Using Other Classes"""
         self.kinect = Kinect()
-        self.rexarm = Rexarm((base,shld,elbw,wrst,wrst2),0)
+        self.rexarm = Rexarm((base,shld,elbw,wrst,wrst2,wrst3,grip1),0)
         self.tp = TrajectoryPlanner(self.rexarm)
         self.sm = StateMachine(self.rexarm, self.tp, self.kinect)
     
@@ -124,6 +130,10 @@ class Gui(QMainWindow):
         self.ui.sldrWrist.valueChanged.connect(self.sliderChange)
 
         self.ui.sldrWrist2.valueChanged.connect(self.sliderChange)
+
+        self.ui.sldrWrist3.valueChanged.connect(self.sliderChange)
+
+        self.ui.sldrGrip1.valueChanged.connect(self.sliderChange)
 
         self.ui.sldrMaxTorque.valueChanged.connect(self.sliderChange)
         self.ui.sldrSpeed.valueChanged.connect(self.sliderChange)
@@ -247,18 +257,23 @@ class Gui(QMainWindow):
         self.ui.rdoutShoulder.setText(str(self.ui.sldrShoulder.value()))
         self.ui.rdoutElbow.setText(str(self.ui.sldrElbow.value()))
         self.ui.rdoutWrist.setText(str(self.ui.sldrWrist.value()))
-
         self.ui.rdoutWrist2.setText(str(self.ui.sldrWrist2.value()))
+        self.ui.rdoutWrist3.setText(str(self.ui.sldrWrist3.value()))
+        self.ui.rdoutGrip1.setText(str(self.ui.sldrGrip1.value()))
 
         self.ui.rdoutTorq.setText(str(self.ui.sldrMaxTorque.value()) + "%")
         self.ui.rdoutSpeed.setText(str(self.ui.sldrSpeed.value()) + "%")
+
         self.rexarm.set_torque_limits([self.ui.sldrMaxTorque.value()/100.0]*self.rexarm.num_joints, update_now = False)
         self.rexarm.set_speeds_normalized_global(self.ui.sldrSpeed.value()/100.0, update_now = False)
         joint_positions = np.array([self.ui.sldrBase.value()*D2R, 
                            self.ui.sldrShoulder.value()*D2R,
                            self.ui.sldrElbow.value()*D2R,
                            self.ui.sldrWrist.value()*D2R,
-                           self.ui.sldrWrist2.value()*D2R])
+                           self.ui.sldrWrist2.value()*D2R,
+                           self.ui.sldrWrist3.value()*D2R,
+                           self.ui.sldrGrip1.value()*D2R])
+
         self.rexarm.set_positions(joint_positions, update_now = False)
 
     def directControlChk(self, state):
