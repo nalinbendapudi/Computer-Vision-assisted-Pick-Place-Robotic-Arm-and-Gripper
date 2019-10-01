@@ -27,7 +27,7 @@ def cubicInterpolation (initialAngle, finalAngle, initialVelocity, finalVelocity
 		angles.append(q)
 		velocities.append(v)
 	
-	return [angles,velocities]
+	return velocities, angles
 		
 		
 	

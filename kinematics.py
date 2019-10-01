@@ -77,45 +77,63 @@ def get_transformation(joint_angles, target = 6, base = 0):
             raise AssertionError("Product matrix is invalid")
     return rtn
 
-def FK_dh(joint_angles, link):
-    """
-    TODO: implement this function
 
-    Calculate forward kinematics for rexarm using DH convention
-
-    return a transformation matrix representing the pose of the 
-    desired link
-
-    note: phi is the euler angle about the y-axis in the base frame
-
-    """
-    pass
-
-def FK_pox(joint_angles):
-    """
-    TODO: implement this function
-
-    Calculate forward kinematics for rexarm
-    using product of exponential formulation
-
-    return a 4-tuple (x, y, z, phi) representing the pose of the 
-    desired link
-
-    note: phi is the euler angle about y in the base frame
-
-    """
-    pass
 
 def IK(pose):
-    """
-    TODO: implement this function
+    # pose is the final 4X4 homogeneous matrix of last frame. This is a numpy array
+    R = pose[:3,:3]
+    X = pose[0][3]
+    Y = pose[1][3]
+    Z = pose[2][3]
 
-    Calculate inverse kinematics for rexarm
+    X_c = X - LS[3]*R[0][2]
+    Y_c = Y - LS[3]*R[1][2]
+    Z_c = Z - LS[3]*R[2][2]
 
-    return the required joint angles
+    # print "IK end 1:\n", X_c, Y_c, Z_c 
 
-    """
-    pass
+    theta1 = np.arctan2(Y_c,X_c)
+    # print(theta1*180.0/3.141592)
+    #theta1 = np.pi + theta1          # Other solution
+    r = np.sqrt(X_c**2 + Y_c**2)      # x in 2R arm case
+    s = Z_c - LS[0]                   # y in 2R arm case
+    # print(r)
+    # print(s)
+    theta3 = np.arccos((r**2+s**2-LS[1]**2-LS[2]**2)/(2*LS[1]*LS[2]))
+    #theta3 = -1* theta3              # Other solution
+    theta2 = np.pi/2 - np.arctan2(s,r) - np.arctan2(LS[2]*np.sin(theta3) , LS[1]+LS[2]*np.cos(theta3))
+
+    # print(np.array([theta1, theta2, theta3])*180.0/3.14)
+
+    R_01 = np.array([[np.cos(theta1),-np.sin(theta1),0.],[np.sin(theta1), np.cos(theta1),0.],[0., 0., 1.]])
+    R_12 = np.array([[np.cos(theta2),0.,np.sin(theta2)],[0.,1.,0.],[-np.sin(theta2),0.,np.cos(theta2)]])
+    R_23 = np.array([[np.cos(theta3),0.,np.sin(theta3)],[0.,1.,0.],[-np.sin(theta3),0.,np.cos(theta3)]])
+
+    R_02 = np.matmul(R_01,R_12)
+    R_03 = np.matmul(R_02,R_23)
+
+    # R_03 = np.array([[np.cos(theta1)*np.cos(theta2+theta3), -np.cos(theta1)*np.sin(theta2+theta3),  np.sin(theta1)  ],
+    #                  [np.sin(theta1)*np.cos(theta2+theta3), -np.sin(theta1)*np.sin(theta2+theta3), -np.cos(theta1)  ],
+    #                  [               np.sin(theta2+theta3),                 np.cos(theta2+theta3),               1  ]])
+    R_36 = np.matmul(R_03.T,R)
+
+    theta4 = np.arctan2(R_36[1][2], R_36[0][2])
+    theta5 = np.arctan2(np.sqrt(1-R_36[2][2]**2), R_36[2][2])
+    #theta5 = -1*theta5               # Other solution
+    theta6 = np.arctan2(R_36[2][1], -R_36[2][0])
+
+    return [theta1, theta2, theta3, theta4, theta5, theta6, 0.]
+
+
+
+
+
+
+
+
+
+
+
 
 
 def get_euler_angles_from_T(T):
@@ -132,15 +150,5 @@ def get_pose_from_T(T):
     return the joint pose from a T matrix
     of the form (x,y,z,phi) where phi is rotation about base frame y-axis
     
-    """
-    pass
-
-
-
-
-def to_s_matrix(w,v):
-    """
-    TODO: implement this function
-    Find the [s] matrix for the POX method e^([s]*theta)
     """
     pass
