@@ -3,6 +3,7 @@ import numpy as np
 from PyQt4.QtGui import QImage
 import freenect
 import os
+import blob_detector as bd
 class Kinect():
     def __init__(self):
         self.currentVideoFrame = np.array([])
@@ -19,6 +20,7 @@ class Kinect():
         self.new_click = False
         self.rgb_click_points = np.zeros((4,2),int)
         self.depth_click_points = np.zeros((4,2),int)
+        self.sm = None
 
         """ Extra arrays for colormaping the depth image"""
         self.DepthHSV = np.zeros((480,640,3)).astype(np.uint8)
@@ -26,6 +28,11 @@ class Kinect():
 
         """ block info """
         self.block_contours = np.array([])
+        self.z_reference = 940
+        self.block_poses = []
+
+    def get_sm(self,sm):
+        self.sm = sm
 
     def captureVideoFrame(self):
         """                      
@@ -51,6 +58,8 @@ class Kinect():
                 self.currentDepthFrame = self.registerDepthFrame(freenect.sync_get_depth()[0])
             else:
                 self.currentDepthFrame = freenect.sync_get_depth()[0]
+            if self.kinectCalibrated:
+                self.detectBlocksInDepthImage()
         else:
             self.loadDepthFrame()
 
@@ -153,10 +162,56 @@ class Kinect():
         """
         pass
 
-    def detectBlocksInDepthImage(self):
+    def check_valid_block(self, p_w, z):
+        if p_w[0] < -307 or p_w[0] > 307 or p_w[1] < -307 or p_w[1] > 307:
+            return False
+        return True
+
+    def detectBlocksInDepthImage(self, use_opencv = False):
+        # False: blob detection
+        # True: block detection
         """
         TODO:
         Implement a blob detector to find blocks
         in the depth image
         """
-        pass
+        depth = cv2.GaussianBlur(self.currentDepthFrame, (5, 5), 0)
+        height = self.z_reference - (0.1236 * np.tan(depth/2842.5 + 1.1863)*1000)
+        # Filter out outliers
+        height[height < 10] = 0
+        height[height > 200] = 0
+        # make blocks equal height
+        # height[height > 20] = 40
+        # Erosion
+        kernel = np.ones((5,5),np.uint8)
+        height = cv2.erode(height,kernel,iterations = 1)
+        # self.currentDepthFrame = height
+        '''
+        OpenCV contour methods
+        '''
+        valid_cnts = []
+        block_poses = []
+        if use_opencv:
+            _, contours, _ = cv2.findContours(height.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+            font = cv2.FONT_HERSHEY_COMPLEX
+            valid_cnts = []
+            for cnt in contours:
+                area = cv2.contourArea(cnt) 
+                if area < 30:
+                    continue
+                approx = cv2.approxPolyDP(cnt, 0.1*cv2.arcLength(cnt, True), True) 
+                valid_cnts.append(approx)
+        else:
+            _, coordinates, nsig = bd.detectBlob(height)
+            for c in coordinates:
+                try:
+                    p_w, z = self.sm.pixel2world(c[0], c[1])
+                    if not self.check_valid_block(p_w, z):
+                        continue
+                except:
+                    continue
+                cv2.circle(self.currentDepthFrame, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=(100,0,0), thickness = 5)
+                block_poses.append([p_w[0], p_w[1], z, 0, 0, 0])
+        self.block_poses = block_poses
+        # self.block_contours = valid_cnts

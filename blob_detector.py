@@ -36,6 +36,18 @@ def get_box(centers, len):
     return np.array(rtn)
 
 
+def detectBlob(depth):
+    nsig = 8
+    kernlen = 6*nsig+1
+    LoG = LoGkern2(kernlen, nsig)
+    dest = cv2.filter2D(depth, ddepth=cv2.CV_64F,kernel = LoG)
+    coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=1, num_peaks=10)
+    cnts = get_box(coordinates, 30)
+    # for c in coordinates:
+    #     cv2.circle(blobs, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=(0,255,0), thickness = 10)
+    return cnts, coordinates, nsig
+
+
 def detect(rgb, depth):
     nsig = 8
     kernlen = 6*nsig+1
@@ -46,23 +58,15 @@ def detect(rgb, depth):
     blobs = deepcopy(rgb)
     for c in coordinates:
         cv2.circle(blobs, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=(0,255,0), thickness = 10)
-    plt.subplot(221),plt.imshow(depth),plt.title('Input')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(222),plt.imshow(LoG),plt.title('LoG filter')
-    plt.xticks([]), plt.yticks([])
-    # canny = cv2.Canny(depth.astype(np.uint8), 100, 200)
-    # plt.subplot(222),plt.imshow(canny),plt.title('Canny')
-    # corner = cv2.cornerHarris(depth.astype(np.uint8),2,1,0.04)
-    # corner = cv2.dilate(corner,None)
-    # corner_img = deepcopy(rgb)
-    # corner_img[corner>0.01*corner.max()]=[0,255,0]
-    # plt.subplot(222),plt.imshow(corner),plt.title('corner')
+    # plt.subplot(221),plt.imshow(depth),plt.title('Input')
     # plt.xticks([]), plt.yticks([])
-    plt.subplot(223),plt.imshow(dest),plt.title('Response')
-    plt.xticks([]), plt.yticks([])
-    plt.subplot(224),plt.imshow(blobs),plt.title('Detection')
-    plt.xticks([]), plt.yticks([])
-    plt.show()
+    # plt.subplot(222),plt.imshow(LoG),plt.title('LoG filter')
+    # plt.xticks([]), plt.yticks([])
+    # plt.subplot(223),plt.imshow(dest),plt.title('Response')
+    # plt.xticks([]), plt.yticks([])
+    # plt.subplot(224),plt.imshow(blobs),plt.title('Detection')
+    # plt.xticks([]), plt.yticks([])
+    # plt.show()
 
     
 def plot_result(rgb, depth):

@@ -116,6 +116,7 @@ class Gui(QMainWindow):
         self.rexarm = Rexarm((base,shld,elbw,wrst,wrst2,wrst3,grip1),0)
         self.tp = TrajectoryPlanner(self.rexarm)
         self.sm = StateMachine(self.rexarm, self.tp, self.kinect)
+        self.kinect.get_sm(self.sm)
     
         """ 
         Attach Functions to Buttons & Sliders

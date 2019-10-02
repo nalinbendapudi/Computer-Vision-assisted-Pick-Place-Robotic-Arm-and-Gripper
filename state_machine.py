@@ -17,7 +17,7 @@ class StateMachine():
         self.next_state = "idle"
         self.intrinsic = np.eye(3)
         self.cam2world = np.array([[1, 0, 0],[0, 1, 0]])
-        self.z_reference = 940
+        self.z_reference = self.kinect.z_reference
 
     def set_next_state(self, state):
         self.next_state = state
@@ -84,6 +84,8 @@ class StateMachine():
 
     """Functions run for each state"""
     def execute(self):
+        # np.save('rgb.npy', self.kinect.currentVideoFrame)
+        # np.save('depth.npy', self.kinect.currentDepthFrame)
         self.status_message = "State: Execute - task 1.2"
         self.current_state = "execute"
 
