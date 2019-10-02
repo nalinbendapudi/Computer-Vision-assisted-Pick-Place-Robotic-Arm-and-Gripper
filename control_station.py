@@ -202,9 +202,11 @@ class Gui(QMainWindow):
 
         if(len(joints)>5):
             self.ui.rdoutWrist3JC.setText(str("%+.2f" % (joints[5]*R2D)))
+            self.ui.rdoutGrip1.setText(str("%+.2f" % (joints[6]*R2D)))
 
         else:
             self.ui.rdoutWrist3JC.setText(str("N.A."))
+            self.ui.rdoutGrip1.setText(str("N.A."))
 
     @pyqtSlot(list)
     def updateEndEffectorReadout(self, pos):

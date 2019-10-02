@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import copy
+from kinematics import *
 
 """
 TODO: Add states and state functions to this class
@@ -79,15 +80,41 @@ class StateMachine():
     def execute(self):
         self.status_message = "State: Execute - task 1.2"
         self.current_state = "execute"
-        poses = [[ 0.0, 0.0, 0.0, 0.0, 0.0],
-        [ 1.0, 0.8, 1.0, 0.5, 1.0],
-        [-1.0,-0.8,-1.0,-0.5, -1.0],
-        [-1.0, 0.8, 1.0, 0.5, 1.0],
-        [1.0, -0.8,-1.0,-0.5, -1.0],
-        [ 0.0, 0.0, 0.0, 0.0, 0.0]]
-        for pose in poses:
-            self.rexarm.set_positions(pose)
-            self.rexarm.pause(1)
+
+        poses = []
+        move_back = [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+        end_effector_pose = np.eye(4)
+        end_effector_pose[:3,:3] = np.array([[1., 0., 0.],[0., -1., 0.],[0., 0., -1.]])
+        end_effector_pose[0][3] = -150
+        end_effector_pose[1][3] = -153
+        end_effector_pose[2][3] = 50
+
+        # print 'IK:\n', end_effector_pose
+        
+        pose = IK(end_effector_pose)
+
+        enable = 1
+
+        for i in range(len(pose)):
+            if pose[i] < self.rexarm.angle_limits[i,0] or pose[i] > self.rexarm.angle_limits[i,1]:
+                print 'configuration exceeds joint limits\n'
+                enable = 0
+                break
+
+        # poses = [[ 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.0],
+        # [-0.8,-0.8,-0.8,-0.8, -0.8, 0.0, 2],
+        # [-0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.0],
+        # [0.8, -0.8,-0.8,-0.8, -0.8, 0.0, 2],
+        # [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
+        if enable:
+            poses.append(pose)
+            poses.append(move_back)
+            for pose in poses:
+                # print 'FK:\n',get_transformation(pose)
+                plan_speeds, plan_angles = self.tp.generate_plan(pose)
+                self.tp.execute_plan(plan_speeds, plan_angles)
+                self.rexarm.pause(1)
         self.next_state = "idle"
 
     def manual(self):
