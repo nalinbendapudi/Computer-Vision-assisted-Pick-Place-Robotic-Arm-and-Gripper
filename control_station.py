@@ -244,7 +244,6 @@ class Gui(QMainWindow):
         self.sm.set_next_state("finish")
         self.ui.btn_task3.setEnabled(True)
         self.ui.btn_task1.setText("RECORD")
-
     
     def replay(self):
         print('Hit replay Button!!')
@@ -303,10 +302,7 @@ class Gui(QMainWindow):
             x = x - MIN_X
             y = y - MIN_Y
             if(self.kinect.currentDepthFrame.any() != 0):
-                d = self.kinect.currentDepthFrame[y][x]
-                z = 0.1236 * np.tan(d/2842.5 + 1.1863)*1000
-                p_c = np.matmul(np.linalg.inv(self.sm.intrinsic), z*np.array([[x],[y],[1]])).reshape(-1)
-                p_w = np.matmul(self.sm.cam2world,  np.array([[p_c[0]], [p_c[1]], [1]]))
+                p_w, z = self.sm.pixel2world(x,y)
 
                 self.ui.rdoutMousePixels.setText("(%.0f,%.0f,%.0f)" % (x,y,z))
                 self.ui.rdoutMouseWorld.setText("(%.0f,%.0f,%.0f)" % (p_w[0],p_w[1],self.sm.z_reference-z))

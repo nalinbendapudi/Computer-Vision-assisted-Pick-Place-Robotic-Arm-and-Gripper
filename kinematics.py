@@ -99,7 +99,7 @@ def IK(pose):
     s = Z_c - LS[0]                   # y in 2R arm case
     # print(r)
     # print(s)
-    theta3 = np.arccos((r**2+s**2-LS[1]**2-LS[2]**2)/(2*LS[1]*LS[2]))
+    theta3 = np.arccos(np.clip((r**2+s**2-LS[1]**2-LS[2]**2)/(2*LS[1]*LS[2]), -1, 1))
     #theta3 = -1* theta3              # Other solution
     theta2 = np.pi/2 - np.arctan2(s,r) - np.arctan2(LS[2]*np.sin(theta3) , LS[1]+LS[2]*np.cos(theta3))
 
@@ -122,7 +122,7 @@ def IK(pose):
     #theta5 = -1*theta5               # Other solution
     theta6 = np.arctan2(R_36[2][1], -R_36[2][0])
 
-    return [theta1, theta2, theta3, theta4, theta5, theta6, 0.]
+    return [theta1, theta2, theta3, theta4, theta5, theta6]
 
 
 

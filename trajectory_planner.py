@@ -16,7 +16,7 @@ class TrajectoryPlanner():
         self.num_joints = rexarm.num_joints
         self.initial_wp = [0.0]*self.num_joints
         self.final_wp = [0.0]*self.num_joints 
-        self.dt = 0.03 # command rate
+        self.dt = 0.04 # command rate
     
     def set_initial_wp(self):
         # sets the next initial_wp
@@ -32,7 +32,7 @@ class TrajectoryPlanner():
     def stop(self):
         pass
 
-    def calc_time_from_waypoints(self, max_speed = 0.5):
+    def calc_time_from_waypoints(self, max_speed = 0.4):
         # Returns min time given initial wp, final wp and max speed
         return max(np.absolute(np.array(self.final_wp) - np.array(self.initial_wp)))/max_speed
 
@@ -67,8 +67,4 @@ class TrajectoryPlanner():
     def execute_plan(self, plan_speeds, plan_angles, look_ahead=8):
         for i in range(np.shape(plan_speeds)[0]):
             self.rexarm.set_speeds_normalized(plan_speeds[i,:])
-            # self.rexarm.get_feedback()
-            # print(self.rexarm.speed_fb)
             self.rexarm.set_positions(plan_angles[i,:])
-            
-            # self.rexarm.pause(0.2)
