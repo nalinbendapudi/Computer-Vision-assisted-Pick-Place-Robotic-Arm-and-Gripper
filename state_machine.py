@@ -82,12 +82,30 @@ class StateMachine():
         p_w = np.matmul(self.cam2world,  np.array([[p_c[0]], [p_c[1]], [1]]))
         return p_w, z
 
+    def end_effector_orientation(self, x, y, grip_angle):
+        if x > 0.0 and x >= np.absolute(y):
+            R_z = get_T_from_angle(2, np.pi/2)
+            R_x = get_T_from_angle(0, grip_angle)
+            orientation = np.matmul(R_z, R_x)
+        elif y > 0.0 and y >= np.absolute(x):
+            orientation = get_T_from_angle(0, -grip_angle)
+        elif x < 0.0 and -x >= np.absolute(y):
+            R_z = get_T_from_angle(2, -np.pi/2)
+            R_x = get_T_from_angle(0, grip_angle)
+            orientation = np.matmul(R_z, R_x)
+        else:
+            orientation = get_T_from_angle(0, grip_angle)
+
+        return orientation
+
     """Functions run for each state"""
     def execute(self):
         # np.save('rgb.npy', self.kinect.currentVideoFrame)
         # np.save('depth.npy', self.kinect.currentDepthFrame)
         self.status_message = "State: Execute - task 1.2"
         self.current_state = "execute"
+
+        enable = 1
 
         pick_put_3D = []
         location_strings = ["Pick Pose",
@@ -104,75 +122,131 @@ class StateMachine():
                     i = i + 1
                     self.kinect.new_click = False 
         pick_put_3D = np.array(pick_put_3D)
-        print(pick_put_3D)
-        cfgs = []
+        # print(pick_put_3D)
+        # print "assigned pick position:\n", pick_put_3D[0]
 
-        # pick motions
 
-        pick_end_effector_pose = np.eye(4)
-        pick_end_effector_pose[:3,:3] = np.array([[1., 0., 0.],[0., -1., 0.],[0., 0., -1.]])
-        pick_end_effector_pose[0][3] = pick_put_3D[0][0]
-        pick_end_effector_pose[1][3] = pick_put_3D[0][1]
-        pick_end_effector_pose[2][3] = pick_put_3D[0][2]
+        # try some end effector orientation in sequence, execute if a viable trajectory is found
+        angles = [np.pi, 3*np.pi/4, np.pi/2]
+        success = 0
+        for angle in angles:
 
-        pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
-        pick_prepare_pose[2][3] = 90
-        
-        pick_target_cfg = IK(pick_end_effector_pose)
-        pick_target_cfg.append(0.0)
-        pick_prepare_target_cfg = IK(pick_prepare_pose)
-        pick_prepare_target_cfg.append(0.0)
+            if success == 1:
+                break
+            
+            orientation = self.end_effector_orientation(pick_put_3D[0][0], pick_put_3D[0][1], angle)
 
-        enable = 1
+            cfgs = []
 
-        # for i in range(len(pick_target_cfg)):
-        #     if pick_target_cfg[i] < self.rexarm.angle_limits[i,0] or pick_target_cfg[i] > self.rexarm.angle_limits[i,1]:
-        #         print 'configuration exceeds joint limits\n'
-        #         enable = 0
-        #         break
+            # pick motions
 
-        pick_intermediate_cfg_go = copy.deepcopy(pick_prepare_target_cfg)
-        pick_intermediate_cfg_go[1] = pick_intermediate_cfg_go[2] = pick_intermediate_cfg_go[4] = 0
+            pick_end_effector_pose = np.eye(4)
+            pick_end_effector_pose[:3,:3] = copy.deepcopy(orientation)
+            # pick_end_effector_pose[0][3] = pick_put_3D[0][0]
+            # pick_end_effector_pose[1][3] = pick_put_3D[0][1]
+            # pick_end_effector_pose[2][3] = pick_put_3D[0][2]
 
-        gripper_close = copy.deepcopy(pick_target_cfg)
-        gripper_close[6] = 2.65
+            # leave some margin for gripper
+            pick_point = np.array([[pick_put_3D[0][0]],[pick_put_3D[0][1]],[pick_put_3D[0][2]]])
+            z_axis = np.array([[0.0],[0.0],[1.0]])
+            print np.matmul(orientation,z_axis)
+            pick_end_effector_pose[:3,3:4] = pick_point - 10.0 * np.matmul(orientation,z_axis)
 
-        pick_prepare_target_cfg_back = copy.deepcopy(pick_prepare_target_cfg)
-        pick_prepare_target_cfg_back[6] = 2.65
+            pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
+            pick_prepare_pose[2][3] = 90.0
+            
+            pick_target_cfg = IK(pick_end_effector_pose)
 
-        pick_intermediate_cfg_back = copy.deepcopy(pick_intermediate_cfg_go)
-        pick_intermediate_cfg_back[6] = 2.65
+            if pick_target_cfg is None:
+                continue
 
-        pick_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.65]
+            pick_target_cfg.append(0.0)
 
-        # put motions
-        put_end_effector_pose = np.eye(4)
-        put_end_effector_pose[:3,:3] = np.array([[1., 0., 0.],[0., -1., 0.],[0., 0., -1.]])
-        put_end_effector_pose[0][3] = pick_put_3D[1][0]
-        put_end_effector_pose[1][3] = pick_put_3D[1][1]
-        put_end_effector_pose[2][3] = pick_put_3D[1][2]
+            for i in range(len(pick_target_cfg)):
+                if pick_target_cfg[i] < self.rexarm.angle_limits[i,0] or pick_target_cfg[i] > self.rexarm.angle_limits[i,1]:
+                    # print 'configuration exceeds joint limits\n'
+                    enable = 0
+                    break
+            
+            if enable == 0:
+                continue
 
-        put_prepare_pose = copy.deepcopy(put_end_effector_pose)
-        put_prepare_pose[2][3] = 90
-        
-        put_target_cfg = IK(put_end_effector_pose)
-        put_target_cfg.append(2.65)
-        put_prepare_target_cfg = IK(put_prepare_pose)
-        put_prepare_target_cfg.append(2.65)
+            pick_prepare_target_cfg = IK(pick_prepare_pose)
 
-        put_intermediate_cfg_go = copy.deepcopy(put_prepare_target_cfg)
-        put_intermediate_cfg_go[1] = put_intermediate_cfg_go[2] = put_intermediate_cfg_go[4] = 0
+            if pick_prepare_target_cfg is None:
+                continue
 
-        gripper_open = copy.deepcopy(put_target_cfg)
-        gripper_open[6] = 0.0
+            pick_prepare_target_cfg.append(0.0)
 
-        put_prepare_target_cfg_back = copy.deepcopy(put_prepare_target_cfg)
-        put_prepare_target_cfg_back[6] = 0.0
+            for i in range(len(pick_prepare_target_cfg)):
+                if pick_prepare_target_cfg[i] < self.rexarm.angle_limits[i,0] or pick_prepare_target_cfg[i] > self.rexarm.angle_limits[i,1]:
+                    # print 'configuration exceeds joint limits\n'
+                    enable = 0
+                    break
 
-        put_intermediate_cfg_back = copy.deepcopy(put_intermediate_cfg_go)
-        put_intermediate_cfg_back[6] = 0.0
+            if enable == 0:
+                continue
 
-        put_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            # pick_intermediate_cfg_go = copy.deepcopy(pick_prepare_target_cfg)
+            # pick_intermediate_cfg_go[1] = pick_intermediate_cfg_go[2] = pick_intermediate_cfg_go[4] = 0
+
+            gripper_close = copy.deepcopy(pick_target_cfg)
+            gripper_close[6] = 2.65
+
+            pick_prepare_target_cfg_back = copy.deepcopy(pick_prepare_target_cfg)
+            pick_prepare_target_cfg_back[6] = 2.65
+
+            # pick_intermediate_cfg_back = copy.deepcopy(pick_intermediate_cfg_go)
+            # pick_intermediate_cfg_back[6] = 2.65
+
+            pick_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.65]
+
+            # # put motions
+            # put_end_effector_pose = np.eye(4)
+            # put_end_effector_pose[:3,:3] = np.array([[1., 0., 0.],[0., -1., 0.],[0., 0., -1.]])
+            # put_end_effector_pose[0][3] = pick_put_3D[1][0]
+            # put_end_effector_pose[1][3] = pick_put_3D[1][1]
+            # put_end_effector_pose[2][3] = pick_put_3D[1][2]
+
+            # put_prepare_pose = copy.deepcopy(put_end_effector_pose)
+            # put_prepare_pose[2][3] = 90
+            
+            # put_target_cfg = IK(put_end_effector_pose)
+
+            # if put_target_cfg is None:
+            #     continue
+
+            # put_target_cfg.append(2.65)
+
+            # for i in range(len(put_target_cfg)):
+            #     if put_target_cfg[i] < self.rexarm.angle_limits[i,0] or put_target_cfg[i] > self.rexarm.angle_limits[i,1]:
+            #         print 'configuration exceeds joint limits\n'
+            #         enable = 0
+            #         break
+            
+            # if enable == 0:
+            #     continue
+
+            # put_prepare_target_cfg = IK(put_prepare_pose)
+            # put_prepare_target_cfg.append(2.65)
+
+            # # put_intermediate_cfg_go = copy.deepcopy(put_prepare_target_cfg)
+            # # put_intermediate_cfg_go[1] = put_intermediate_cfg_go[2] = put_intermediate_cfg_go[4] = 0
+
+            # gripper_open = copy.deepcopy(put_target_cfg)
+            # gripper_open[6] = 0.0
+
+            # put_prepare_target_cfg_back = copy.deepcopy(put_prepare_target_cfg)
+            # put_prepare_target_cfg_back[6] = 0.0
+
+            # # put_intermediate_cfg_back = copy.deepcopy(put_intermediate_cfg_go)
+            # # put_intermediate_cfg_back[6] = 0.0
+
+            # put_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+            success = 1
+
+        # print 'exact position:\n',get_transformation(pick_target_cfg)
 
 
         # poses = [[ 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.0],
@@ -180,26 +254,32 @@ class StateMachine():
         # [-0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.0],
         # [0.8, -0.8,-0.8,-0.8, -0.8, 0.0, 2],
         # [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]
-        if enable:
-            cfgs.append(pick_intermediate_cfg_go)
+        
+        
+        if success:
+            # cfgs.append(pick_intermediate_cfg_go)
             cfgs.append(pick_prepare_target_cfg)
             cfgs.append(pick_target_cfg)
             cfgs.append(gripper_close)
             cfgs.append(pick_prepare_target_cfg_back)
-            cfgs.append(pick_intermediate_cfg_back)
+            # cfgs.append(pick_intermediate_cfg_back)
             cfgs.append(pick_move_back)
-            cfgs.append(put_intermediate_cfg_go)
-            cfgs.append(put_prepare_target_cfg)
-            cfgs.append(put_target_cfg)
-            cfgs.append(gripper_open)
-            cfgs.append(put_prepare_target_cfg_back)
-            cfgs.append(put_intermediate_cfg_back)
-            cfgs.append(put_move_back)
+            cfgs.append([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            # # cfgs.append(put_intermediate_cfg_go)
+            # cfgs.append(put_prepare_target_cfg)
+            # cfgs.append(put_target_cfg)
+            # cfgs.append(gripper_open)
+            # cfgs.append(put_prepare_target_cfg_back)
+            # # cfgs.append(put_intermediate_cfg_back)
+            # cfgs.append(put_move_back)
             for cfg in cfgs:
                 # print 'FK:\n',get_transformation(pose)
                 plan_speeds, plan_angles = self.tp.generate_plan(cfg)
                 self.tp.execute_plan(plan_speeds, plan_angles)
                 self.rexarm.pause(1)
+        else:
+            print "can not execute\n"
+
         self.next_state = "idle"
 
     def manual(self):
