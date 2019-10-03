@@ -230,7 +230,7 @@ class Gui(QMainWindow):
         self.sm.set_next_state("estop")
 
     def execute(self):
-        print('Hit Execute Button!!')
+        print('\n\nHit Execute Button!!')
         self.sm.set_next_state("execute")
 
     def record(self):
