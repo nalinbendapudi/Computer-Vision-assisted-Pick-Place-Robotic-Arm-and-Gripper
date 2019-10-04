@@ -48,6 +48,8 @@ class StateMachine():
                 self.start_record()
             if (self.next_state == "replay"):
                 self.replay()
+            if (self.next_state == "task1"):
+                self.task1()
                 
         if(self.current_state == "estop"):
             self.next_state = "estop"
@@ -74,6 +76,10 @@ class StateMachine():
         if self.current_state == "replay":
             if (self.next_state == "estop"):
                 self.estop()
+
+        if self.current_state == "task1":
+            if (self.next_state == "estop"):
+                self.estop()
             
     def pixel2world(self, x, y):
         d = self.kinect.currentDepthFrame[y][x]
@@ -84,17 +90,26 @@ class StateMachine():
 
     def end_effector_orientation(self, x, y, grip_angle):
         if x > 0.0 and x >= np.absolute(y):
-            R_z = get_T_from_angle(2, np.pi/2)
-            R_x = get_T_from_angle(0, grip_angle)
-            orientation = np.matmul(R_z, R_x)
+            rotation_angle = np.pi/2
+            # R_z = get_T_from_angle(2, np.pi/2)
+            # R_x = get_T_from_angle(0, grip_angle)
+            # orientation = np.matmul(R_z, R_x)
         elif y > 0.0 and y >= np.absolute(x):
-            orientation = get_T_from_angle(0, -grip_angle)
+            rotation_angle = np.pi
+            # R_z = get_T_from_angle(2, np.pi)
+            # R_x = get_T_from_angle(0, grip_angle)
+            # orientation = np.matmul(R_z, R_x)
         elif x < 0.0 and -x >= np.absolute(y):
-            R_z = get_T_from_angle(2, -np.pi/2)
-            R_x = get_T_from_angle(0, grip_angle)
-            orientation = np.matmul(R_z, R_x)
+            rotation_angle = -np.pi/2
+            # R_z = get_T_from_angle(2, -np.pi/2)
+            # R_x = get_T_from_angle(0, grip_angle)
+            # orientation = np.matmul(R_z, R_x)
         else:
-            orientation = get_T_from_angle(0, grip_angle)
+            rotation_angle = 0.0
+        
+        R_z = get_T_from_angle(2, rotation_angle)
+        R_x = get_T_from_angle(0, grip_angle)
+        orientation = np.matmul(R_z, R_x)
 
         return orientation
 
@@ -122,86 +137,130 @@ class StateMachine():
                     i = i + 1
                     self.kinect.new_click = False 
         pick_put_3D = np.array(pick_put_3D)
-        # print(pick_put_3D)
-        # print "assigned pick position:\n", pick_put_3D[0]
+        print "\n\nassigned pick position:\n", pick_put_3D[0]
 
 
         # try some end effector orientation in sequence, execute if a viable trajectory is found
-        angles = [np.pi, 3*np.pi/4, np.pi/2]
+        angles = [np.pi, 11*np.pi/12, 5*np.pi/6, 3*np.pi/4, 2*np.pi/3, 7*np.pi/12, np.pi/2]
         success = 0
+        cfgs = []
         for angle in angles:
 
             if success == 1:
+                print "find viable solution\n"
                 break
             
-            orientation = self.end_effector_orientation(pick_put_3D[0][0], pick_put_3D[0][1], angle)
+            print "\n\n\ncurrent testing angle: ", angle, "\n" 
 
-            cfgs = []
+            ###################################  pick motion  ###################################
+            
+            # pick orientation
+            pick_orientation = self.end_effector_orientation(pick_put_3D[0][0], pick_put_3D[0][1], angle)
 
-            # pick motions
-
+            # pick pose  
             pick_end_effector_pose = np.eye(4)
-            pick_end_effector_pose[:3,:3] = copy.deepcopy(orientation)
-            # pick_end_effector_pose[0][3] = pick_put_3D[0][0]
-            # pick_end_effector_pose[1][3] = pick_put_3D[0][1]
-            # pick_end_effector_pose[2][3] = pick_put_3D[0][2]
+            pick_end_effector_pose[:3,:3] = copy.deepcopy(pick_orientation)
 
             # leave some margin for gripper
             pick_point = np.array([[pick_put_3D[0][0]],[pick_put_3D[0][1]],[pick_put_3D[0][2]]])
             z_axis = np.array([[0.0],[0.0],[1.0]])
-            print np.matmul(orientation,z_axis)
-            pick_end_effector_pose[:3,3:4] = pick_point - 10.0 * np.matmul(orientation,z_axis)
+            pick_end_effector_pose[:3,3:4] = pick_point - 5.0 * np.matmul(pick_orientation,z_axis)
 
+            if angles != np.pi/2:
+                pick_end_effector_pose[2,3] = pick_end_effector_pose[2,3] + 5.0
+
+            # pick preparation pose
             pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
             pick_prepare_pose[2][3] = 90.0
             
-            pick_target_cfg = IK(pick_end_effector_pose)
+            # compute configuration for pick pose
+            pick_target_cfg = IK(pick_end_effector_pose, self.rexarm.angle_limits)
 
-            if pick_target_cfg is None:
+            if pick_target_cfg == None:
                 continue
 
             pick_target_cfg.append(0.0)
 
-            for i in range(len(pick_target_cfg)):
-                if pick_target_cfg[i] < self.rexarm.angle_limits[i,0] or pick_target_cfg[i] > self.rexarm.angle_limits[i,1]:
-                    # print 'configuration exceeds joint limits\n'
-                    enable = 0
-                    break
-            
-            if enable == 0:
+            # compute configuration for pick preparation pose
+            pick_prepare_target_cfg = IK(pick_prepare_pose, self.rexarm.angle_limits)
+
+            if pick_prepare_target_cfg == None:
                 continue
+            
+            # make sure the configuration difference between pick pose and pick preparation pose is not large
+            difference = np.absolute(pick_prepare_target_cfg[0] - pick_target_cfg[0])
 
-            pick_prepare_target_cfg = IK(pick_prepare_pose)
-
-            if pick_prepare_target_cfg is None:
+            if difference > np.pi/2:
                 continue
 
             pick_prepare_target_cfg.append(0.0)
 
-            for i in range(len(pick_prepare_target_cfg)):
-                if pick_prepare_target_cfg[i] < self.rexarm.angle_limits[i,0] or pick_prepare_target_cfg[i] > self.rexarm.angle_limits[i,1]:
-                    # print 'configuration exceeds joint limits\n'
-                    enable = 0
-                    break
-
-            if enable == 0:
-                continue
-
-            # pick_intermediate_cfg_go = copy.deepcopy(pick_prepare_target_cfg)
-            # pick_intermediate_cfg_go[1] = pick_intermediate_cfg_go[2] = pick_intermediate_cfg_go[4] = 0
-
+            # close gripper 
             gripper_close = copy.deepcopy(pick_target_cfg)
             gripper_close[6] = 2.65
 
+            # preparation pose before moving back
             pick_prepare_target_cfg_back = copy.deepcopy(pick_prepare_target_cfg)
             pick_prepare_target_cfg_back[6] = 2.65
 
-            # pick_intermediate_cfg_back = copy.deepcopy(pick_intermediate_cfg_go)
-            # pick_intermediate_cfg_back[6] = 2.65
-
+            # move back to origin
             pick_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.65]
 
-            # # put motions
+
+            ###################################  put motion  ###################################
+
+            # put orientation
+            put_orientation = self.end_effector_orientation(pick_put_3D[1][0], pick_put_3D[1][1], angle)
+
+            # put pose  
+            put_end_effector_pose = np.eye(4)
+            put_end_effector_pose[:3,:3] = copy.deepcopy(put_orientation)
+
+            # leave some margin for gripper
+            put_point = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
+            z_axis = np.array([[0.0],[0.0],[1.0]])
+            put_end_effector_pose[:3,3:4] = put_point - 5.0 * np.matmul(put_orientation,z_axis)
+
+            if angles != np.pi/2:
+                put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 5.0
+
+            # put preparation pose
+            put_prepare_pose = copy.deepcopy(put_end_effector_pose)
+            put_prepare_pose[2][3] = 90.0
+            
+            # compute configuration for put pose
+            put_target_cfg = IK(put_end_effector_pose, self.rexarm.angle_limits)
+
+            if put_target_cfg == None:
+                continue
+
+            put_target_cfg.append(2.65)
+
+            # compute configuration for put preparation pose
+            put_prepare_target_cfg = IK(put_prepare_pose, self.rexarm.angle_limits)
+
+            if put_prepare_target_cfg == None:
+                continue
+            
+            # make sure the configuration difference between put pose and put preparation pose is not large
+            difference = np.absolute(put_prepare_target_cfg[0] - put_target_cfg[0])
+
+            if difference > np.pi/2:
+                continue
+
+            put_prepare_target_cfg.append(2.65)
+
+            # open gripper 
+            gripper_open = copy.deepcopy(put_target_cfg)
+            gripper_open[6] = 0.0
+
+            # preparation pose before moving back
+            put_prepare_target_cfg_back = copy.deepcopy(put_prepare_target_cfg)
+            put_prepare_target_cfg_back[6] = 0.0
+
+            # move back to origin
+            put_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
             # put_end_effector_pose = np.eye(4)
             # put_end_effector_pose[:3,:3] = np.array([[1., 0., 0.],[0., -1., 0.],[0., 0., -1.]])
             # put_end_effector_pose[0][3] = pick_put_3D[1][0]
@@ -246,8 +305,6 @@ class StateMachine():
 
             success = 1
 
-        # print 'exact position:\n',get_transformation(pick_target_cfg)
-
 
         # poses = [[ 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.0],
         # [-0.8,-0.8,-0.8,-0.8, -0.8, 0.0, 2],
@@ -257,14 +314,16 @@ class StateMachine():
         
         
         if success:
-            # cfgs.append(pick_intermediate_cfg_go)
             cfgs.append(pick_prepare_target_cfg)
             cfgs.append(pick_target_cfg)
             cfgs.append(gripper_close)
             cfgs.append(pick_prepare_target_cfg_back)
-            # cfgs.append(pick_intermediate_cfg_back)
             cfgs.append(pick_move_back)
-            cfgs.append([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            cfgs.append(put_prepare_target_cfg)
+            cfgs.append(put_target_cfg)
+            cfgs.append(gripper_open)
+            cfgs.append(put_prepare_target_cfg_back)
+            cfgs.append(put_move_back)
             # # cfgs.append(put_intermediate_cfg_go)
             # cfgs.append(put_prepare_target_cfg)
             # cfgs.append(put_target_cfg)
@@ -275,12 +334,16 @@ class StateMachine():
             for cfg in cfgs:
                 # print 'FK:\n',get_transformation(pose)
                 plan_speeds, plan_angles = self.tp.generate_plan(cfg)
+                # print plan_speeds, "\n\n\n\n"
                 self.tp.execute_plan(plan_speeds, plan_angles)
                 self.rexarm.pause(1)
         else:
             print "can not execute\n"
 
         self.next_state = "idle"
+
+    def task1(self):
+        pass
 
     def manual(self):
         self.status_message = "State: Manual - Use sliders to control arm"

@@ -111,6 +111,9 @@ class Gui(QMainWindow):
         wrst3 = DXL_XL(port_num, 6)
         grip1 = DXL_XL(port_num, 7)
 
+        wrst2.set_compliance(10,16)
+
+
         """Objects Using Other Classes"""
         self.kinect = Kinect()
         self.rexarm = Rexarm((base,shld,elbw,wrst,wrst2,wrst3,grip1),0)

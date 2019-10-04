@@ -86,15 +86,18 @@ def IK(pose, angle_limits):
     Y = pose[1][3]
     Z = pose[2][3]
 
+    # end effector position for the first three joints
     X_c = X - LS[3]*R[0][2]
     Y_c = Y - LS[3]*R[1][2]
     Z_c = Z - LS[3]*R[2][2]
 
+    # parameters for computing the configuration of first three joints
     r = np.sqrt(X_c**2 + Y_c**2)      # x in 2R arm case
     s = Z_c - LS[0]                   # y in 2R arm case
 
     v1 = np.arctan2(Y_c,X_c)
-    
+
+    # theta 1 has two solutions    
     for i in [v1, v1 + np.pi]:
         theta1 = i
         
@@ -103,9 +106,11 @@ def IK(pose, angle_limits):
             continue
         v3 = np.arccos(acos_theta_3)
 
+        # theta 3 has two solutions
         for j in [v3, -v3]:
             theta3 = j
 
+            # the formulas for computing theta 2 are different for different theta 1 
             if theta1 == v1:
                 sign = 1.0
             else:
@@ -120,7 +125,7 @@ def IK(pose, angle_limits):
             R_02 = np.matmul(R_01,R_12)
             R_03 = np.matmul(R_02,R_23)
 
-
+            # get the orientation difference between the end effector of the first three joints and all six joints
             R_36 = np.matmul(R_03.T,R)
 
             theta4 = np.arctan2(R_36[1][2], R_36[0][2])
@@ -134,11 +139,11 @@ def IK(pose, angle_limits):
             theta5 = np.arctan2(sin_theta5, cos_theta5)
 
 
-
             cfg = [theta1, theta2, theta3, theta4, theta5, theta6]
 
             viable = 1
 
+            # check if the configuration exceed joint anlge limits
             for i in range(len(cfg)) :
                 if cfg[i] < angle_limits[i,0] or cfg[i] > angle_limits[i,1]:
                     viable = 0
