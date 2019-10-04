@@ -93,11 +93,7 @@ def IK(pose, angle_limits):
     r = np.sqrt(X_c**2 + Y_c**2)      # x in 2R arm case
     s = Z_c - LS[0]                   # y in 2R arm case
 
-    # print "IK end 1:\n", X_c, Y_c, Z_c 
-
     v1 = np.arctan2(Y_c,X_c)
-    # print(theta1*180.0/3.141592)
-    #theta1 = np.pi + theta1          # Other solution
     
     for i in [v1, v1 + np.pi]:
         theta1 = i
@@ -109,19 +105,13 @@ def IK(pose, angle_limits):
 
         for j in [v3, -v3]:
             theta3 = j
-            
-            # theta3 = np.arccos(acos_theta_3)
-            # if theta3 < angle_limits[2,0] or theta3 > angle_limits[2,1]:
-            #     theta3 = -1* theta3              # Other solution
 
-            if i == v1:
+            if theta1 == v1:
                 sign = 1.0
             else:
                 sign = -1.0
 
-            theta2 = sign * (np.pi/2 - np.arctan2(s,r) - np.arctan2(LS[2]*np.sin(theta3) , LS[1]+LS[2]*np.cos(theta3)))
-
-            # print(np.array([theta1, theta2, theta3])*180.0/3.14)
+            theta2 = sign * (np.pi/2 - np.arctan2(s,r) - sign * (np.arctan2(LS[2]*np.sin(theta3) , LS[1]+LS[2]*np.cos(theta3))))
 
             R_01 = np.array([[np.cos(theta1),-np.sin(theta1),0.],[np.sin(theta1), np.cos(theta1),0.],[0., 0., 1.]])
             R_12 = np.array([[np.cos(theta2),0.,np.sin(theta2)],[0.,1.,0.],[-np.sin(theta2),0.,np.cos(theta2)]])
@@ -130,35 +120,32 @@ def IK(pose, angle_limits):
             R_02 = np.matmul(R_01,R_12)
             R_03 = np.matmul(R_02,R_23)
 
-            # R_03 = np.array([[np.cos(theta1)*np.cos(theta2+theta3), -np.cos(theta1)*np.sin(theta2+theta3),  np.sin(theta1)  ],
-            #                  [np.sin(theta1)*np.cos(theta2+theta3), -np.sin(theta1)*np.sin(theta2+theta3), -np.cos(theta1)  ],
-            #                  [               np.sin(theta2+theta3),                 np.cos(theta2+theta3),               1  ]])
+
             R_36 = np.matmul(R_03.T,R)
 
             theta4 = np.arctan2(R_36[1][2], R_36[0][2])
 
             theta6 = np.arctan2(R_36[2][1], -R_36[2][0])
 
-            v5 = np.arctan2(np.sqrt(1-R_36[2][2]**2), R_36[2][2])
+            sin_theta5 = R_36[0][2]/np.cos(theta4)
 
-            for k in [v5, -v5]:
-                theta5 = k
-                
-                # if theta5 < angle_limits[4,0] or theta3 > angle_limits[4,1]:
-                #     theta5 = -1*theta5               # Other solution
+            cos_theta5 = R_36[2][2]
 
-                cfg = [theta1, theta2, theta3, theta4, theta5, theta6]
+            theta5 = np.arctan2(sin_theta5, cos_theta5)
 
-                viable = 1
 
-                for i in range(len(cfg)) :
-                    if cfg[i] < angle_limits[i,0] or cfg[i] > angle_limits[i,1]:
-                        # print "configuration not reachable"
-                        viable = 0
-                        break
 
-                if viable:
-                    return cfg
+            cfg = [theta1, theta2, theta3, theta4, theta5, theta6]
+
+            viable = 1
+
+            for i in range(len(cfg)) :
+                if cfg[i] < angle_limits[i,0] or cfg[i] > angle_limits[i,1]:
+                    viable = 0
+                    break
+
+            if viable:
+                return cfg
                     
     return None
 
