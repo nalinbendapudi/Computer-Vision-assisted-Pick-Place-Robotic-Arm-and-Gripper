@@ -165,13 +165,13 @@ class StateMachine():
         pick_put_3D = np.array(pick_put_3D)
         pick_put_3D = np.array([[226.72200641,   2.38742778,  35.2483757 ],[-226.72200641,   2.38742778,  35.2483757 ]])
         '''
-        pick_put_3D = np.array([[pick6d[0],  pick6d[1],  pick6d[2] ],[put6d[0],  put6d[1],  put6d[2]]])
+        pick_put_3D = np.array([[pick6d[0],  pick6d[1],  pick6d[2] ],[-200.0,  10.0,  put6d[2]]])
         print "assigned pick position:\n", pick_put_3D[0]
         print "assigned put position:\n", pick_put_3D[1]
 
 
         # try some end effector orientation in sequence, execute if a viable trajectory is found
-        angles = [np.pi, 11*np.pi/12, 5*np.pi/6, 3*np.pi/4, 2*np.pi/3, 7*np.pi/12, np.pi/2]
+        angles = [i*np.pi/20.0 for i in range(10,21)]
         success = 0
         cfgs = []
         for angle in angles:
@@ -197,10 +197,6 @@ class StateMachine():
             else:
                 pick_end_effector_pose[2,3] = pick_end_effector_pose[2,3] + 20.0
 
-            # pick preparation pose
-            pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
-            pick_prepare_pose[2][3] = pick_end_effector_pose[2,3] + 50.0
-            
             # compute configuration for pick pose
             pick_target_cfg = IK(pick_end_effector_pose, self.rexarm.angle_limits)
 
@@ -209,87 +205,112 @@ class StateMachine():
 
             pick_target_cfg.append(0.0)
 
-            # compute configuration for pick preparation pose
-            pick_prepare_target_cfg = IK(pick_prepare_pose, self.rexarm.angle_limits)
+            # pick preparation pose
+            for pick_prepare_angle in angles:
 
-            if pick_prepare_target_cfg == None:
-                continue
+                if success == 1:
+                    break
+                
+                pick_prepare_orientation = self.end_effector_orientation(pick_put_3D[0][0], pick_put_3D[0][1], pick_prepare_angle)
+
+                pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
+                pick_end_effector_pose[:3,:3] = copy.deepcopy(pick_prepare_orientation)
+                pick_prepare_pose[2,3] = pick_end_effector_pose[2,3] + 60.0
             
-            # make sure the configuration difference between pick pose and pick preparation pose is not large
-            difference = np.absolute(pick_prepare_target_cfg[0] - pick_target_cfg[0])
 
-            if difference > np.pi/2:
-                continue
+                # compute configuration for pick preparation pose
+                pick_prepare_target_cfg = IK(pick_prepare_pose, self.rexarm.angle_limits)
 
-            pick_prepare_target_cfg.append(0.0)
+                if pick_prepare_target_cfg == None:
+                    continue
+            
+                # make sure the configuration difference between pick pose and pick preparation pose is not large
+                pick_difference = [np.absolute(pick_prepare_target_cfg[i] - pick_target_cfg[i]) for i in range(len(pick_prepare_target_cfg))]
 
-            # close gripper 
-            gripper_close = copy.deepcopy(pick_target_cfg)
-            gripper_close[6] = 2.65
+                if max(pick_difference) > np.pi/2:
+                    continue
 
-            # preparation pose before moving back
-            pick_prepare_target_cfg_back = copy.deepcopy(pick_prepare_target_cfg)
-            pick_prepare_target_cfg_back[6] = 2.65
+                pick_prepare_target_cfg.append(0.0)
 
-            # move back to origin
-            pick_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.65]
+                # close gripper 
+                gripper_close = copy.deepcopy(pick_target_cfg)
+                gripper_close[6] = 2.65
+
+                # preparation pose before moving back
+                pick_prepare_target_cfg_back = copy.deepcopy(pick_prepare_target_cfg)
+                pick_prepare_target_cfg_back[6] = 2.65
+
+                # move back to origin
+                pick_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.65]
 
 
             ###################################  put motion  ###################################
 
-            # put orientation
-            put_orientation = self.end_effector_orientation(pick_put_3D[1][0], pick_put_3D[1][1], angle)
+                # put orientation
+                put_orientation = self.end_effector_orientation(pick_put_3D[1][0], pick_put_3D[1][1], angle)
 
-            # put pose  
-            put_end_effector_pose = np.eye(4)
-            put_end_effector_pose[:3,:3] = copy.deepcopy(put_orientation)
-            put_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
+                # put pose  
+                put_end_effector_pose = np.eye(4)
+                put_end_effector_pose[:3,:3] = copy.deepcopy(put_orientation)
+                put_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
 
-            if put_end_effector_pose[2,3] < 40.0:
-                put_end_effector_pose[2,3] = 45.0
-            else:
-                put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 50.0
+                if put_end_effector_pose[2,3] < 40.0:
+                    put_end_effector_pose[2,3] = 45.0
+                else:
+                    put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 50.0
 
-            print "put height: ", put_end_effector_pose[2,3], "\n"
+                # compute configuration for put pose
+                put_target_cfg = IK(put_end_effector_pose, self.rexarm.angle_limits)
+
+                if put_target_cfg == None:
+                    continue
+
+                put_target_cfg.append(2.65)
+
+                # print "put height: ", put_end_effector_pose[2,3], "\n"
+
+                # put preparation pose
+                for put_prepare_angle in angles:
+
+                    if success == 1:
+                        break
+
+                    put_prepare_orientation = self.end_effector_orientation(pick_put_3D[1][0], pick_put_3D[1][1], put_prepare_angle)
+
+                    put_prepare_pose = copy.deepcopy(put_end_effector_pose)
+                    put_end_effector_pose[:3,:3] = copy.deepcopy(put_prepare_orientation)
+                    put_prepare_pose[2,3] = put_end_effector_pose[2,3] + 60.0
+
+                    put_prepare_pose = copy.deepcopy(put_end_effector_pose)
+                    put_prepare_pose[2][3] = put_end_effector_pose[2,3] + 70.0
             
-            # put preparation pose
-            put_prepare_pose = copy.deepcopy(put_end_effector_pose)
-            put_prepare_pose[2][3] = put_end_effector_pose[2,3] + 50.0
-            
-            # compute configuration for put pose
-            put_target_cfg = IK(put_end_effector_pose, self.rexarm.angle_limits)
 
-            if put_target_cfg == None:
-                continue
+                    # compute configuration for put preparation pose
+                    put_prepare_target_cfg = IK(put_prepare_pose, self.rexarm.angle_limits)
 
-            put_target_cfg.append(2.65)
+                    if put_prepare_target_cfg == None:
+                        continue
+                    
+                    # make sure the configuration difference between put pose and put preparation pose is not large
+                    put_difference = [np.absolute(put_prepare_target_cfg[i] - put_target_cfg[i]) for i in range(len(put_prepare_target_cfg))]
 
-            # compute configuration for put preparation pose
-            put_prepare_target_cfg = IK(put_prepare_pose, self.rexarm.angle_limits)
+                    if max(put_difference) > np.pi/2:
+                        continue
 
-            if put_prepare_target_cfg == None:
-                continue
-            
-            # make sure the configuration difference between put pose and put preparation pose is not large
-            difference = np.absolute(put_prepare_target_cfg[0] - put_target_cfg[0])
+                    put_prepare_target_cfg.append(2.65)
 
-            if difference > np.pi/2:
-                continue
+                    # open gripper 
+                    gripper_open = copy.deepcopy(put_target_cfg)
+                    gripper_open[6] = 0.0
 
-            put_prepare_target_cfg.append(2.65)
+                    # preparation pose before moving back
+                    put_prepare_target_cfg_back = copy.deepcopy(put_prepare_target_cfg)
+                    put_prepare_target_cfg_back[6] = 0.0
 
-            # open gripper 
-            gripper_open = copy.deepcopy(put_target_cfg)
-            gripper_open[6] = 0.0
+                    # move back to origin
+                    put_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-            # preparation pose before moving back
-            put_prepare_target_cfg_back = copy.deepcopy(put_prepare_target_cfg)
-            put_prepare_target_cfg_back[6] = 0.0
-
-            # move back to origin
-            put_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-            success = 1
+                    success = 1
         
         if success:
             cfgs.append(pick_prepare_target_cfg)
