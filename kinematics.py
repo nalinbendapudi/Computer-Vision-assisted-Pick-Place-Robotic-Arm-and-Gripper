@@ -9,7 +9,7 @@ There are some functions to start with, you may need to implement a few more
 
 """
 
-LS = np.array([122.43, 110.02, 121.7, 118.48])
+LS = np.array([113.69, 101.4, 112.85, 119.17])
 
 # Checks if a matrix is a valid rotation matrix.
 def _isRotationMatrix(R):

@@ -91,12 +91,12 @@ if __name__ == '__main__':
     print "camera matrix:\r\n", camera_matrix
     print "distortion coefficients:\r\n", dist_coefs.ravel()
 
-    f = open('calibration.cfg', 'w')
-    f.write("intrinsic matrix:\r\n")
-    f.write(str(camera_matrix))
-    f.write("\r\ndistortion coefficients:\r\n")
-    f.write(str( dist_coefs.ravel()))
-    f.close()
+    # f = open('calibration.cfg', 'w')
+    # f.write("intrinsic matrix:\r\n")
+    # f.write(str(camera_matrix))
+    # f.write("\r\ndistortion coefficients:\r\n")
+    # f.write(str( dist_coefs.ravel()))
+    # f.close()
     np.savetxt('calibration.csv', camera_matrix, delimiter=',')
 
     

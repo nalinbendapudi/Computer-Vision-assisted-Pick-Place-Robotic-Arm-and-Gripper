@@ -140,14 +140,14 @@ class StateMachine():
         return orientation
 
     """Functions run for each state"""
-    def execute(self):
+    def execute(self, pick6d = np.array([200,0,50,0,0,0]), put6d=np.array([200,0,50,0,0,0]), directCall = True):
+
         # np.save('rgb.npy', self.kinect.currentVideoFrame)
         # np.save('depth.npy', self.kinect.currentDepthFrame)
         self.status_message = "State: Execute - task 1.2"
         self.current_state = "execute"
-
-        enable = 1
-
+        print("In Execute")
+        '''
         pick_put_3D = []
         location_strings = ["Pick Pose",
                     "Put Pose"]
@@ -163,7 +163,11 @@ class StateMachine():
                     i = i + 1
                     self.kinect.new_click = False 
         pick_put_3D = np.array(pick_put_3D)
-        print "\n\nassigned pick position:\n", pick_put_3D[0]
+        pick_put_3D = np.array([[226.72200641,   2.38742778,  35.2483757 ],[-226.72200641,   2.38742778,  35.2483757 ]])
+        '''
+        pick_put_3D = np.array([[pick6d[0],  pick6d[1],  pick6d[2] ],[put6d[0],  put6d[1],  put6d[2]]])
+        print "assigned pick position:\n", pick_put_3D[0]
+        print "assigned put position:\n", pick_put_3D[1]
 
 
         # try some end effector orientation in sequence, execute if a viable trajectory is found
@@ -176,7 +180,7 @@ class StateMachine():
                 print "find viable solution\n"
                 break
             
-            print "\n\n\ncurrent testing angle: ", angle, "\n" 
+            print "current testing angle: ", angle 
 
             ###################################  pick motion  ###################################
             
@@ -186,18 +190,16 @@ class StateMachine():
             # pick pose  
             pick_end_effector_pose = np.eye(4)
             pick_end_effector_pose[:3,:3] = copy.deepcopy(pick_orientation)
+            pick_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[0][0]],[pick_put_3D[0][1]],[pick_put_3D[0][2]]])
 
-            # leave some margin for gripper
-            pick_point = np.array([[pick_put_3D[0][0]],[pick_put_3D[0][1]],[pick_put_3D[0][2]]])
-            z_axis = np.array([[0.0],[0.0],[1.0]])
-            pick_end_effector_pose[:3,3:4] = pick_point - 5.0 * np.matmul(pick_orientation,z_axis)
-
-            if angles != np.pi/2:
-                pick_end_effector_pose[2,3] = pick_end_effector_pose[2,3] + 5.0
+            if pick_end_effector_pose[2,3] < 35.0:
+                pick_end_effector_pose[2,3] = 40.0
+            else:
+                pick_end_effector_pose[2,3] = pick_end_effector_pose[2,3] + 20.0
 
             # pick preparation pose
             pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
-            pick_prepare_pose[2][3] = 90.0
+            pick_prepare_pose[2][3] = pick_end_effector_pose[2,3] + 50.0
             
             # compute configuration for pick pose
             pick_target_cfg = IK(pick_end_effector_pose, self.rexarm.angle_limits)
@@ -241,18 +243,18 @@ class StateMachine():
             # put pose  
             put_end_effector_pose = np.eye(4)
             put_end_effector_pose[:3,:3] = copy.deepcopy(put_orientation)
+            put_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
 
-            # leave some margin for gripper
-            put_point = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
-            z_axis = np.array([[0.0],[0.0],[1.0]])
-            put_end_effector_pose[:3,3:4] = put_point - 5.0 * np.matmul(put_orientation,z_axis)
+            if put_end_effector_pose[2,3] < 40.0:
+                put_end_effector_pose[2,3] = 45.0
+            else:
+                put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 50.0
 
-            if angles != np.pi/2:
-                put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 5.0
-
+            print "put height: ", put_end_effector_pose[2,3], "\n"
+            
             # put preparation pose
             put_prepare_pose = copy.deepcopy(put_end_effector_pose)
-            put_prepare_pose[2][3] = 90.0
+            put_prepare_pose[2][3] = put_end_effector_pose[2,3] + 50.0
             
             # compute configuration for put pose
             put_target_cfg = IK(put_end_effector_pose, self.rexarm.angle_limits)
@@ -300,161 +302,50 @@ class StateMachine():
             cfgs.append(gripper_open)
             cfgs.append(put_prepare_target_cfg_back)
             cfgs.append(put_move_back)
-            for cfg in cfgs:
-                plan_speeds, plan_angles = self.tp.generate_plan(cfg)
+            for i in range(len(cfgs)):
+                plan_speeds, plan_angles = self.tp.generate_plan(cfgs[i])
                 self.tp.execute_plan(plan_speeds, plan_angles)
                 self.rexarm.pause(1)
         else:
             print "can not execute\n"
-
-        self.next_state = "idle"
+            raise NotImplementedError
+        if directCall:  
+            self.next_state = "idle"
 
     def pick_put(self, pick6d, put6d):
-        # try some end effector orientation in sequence, execute if a viable trajectory is found
-        angles = [np.pi, 11*np.pi/12, 5*np.pi/6, 3*np.pi/4, 2*np.pi/3, 7*np.pi/12, np.pi/2]
-        success = 0
-        cfgs = []
-        for angle in angles:
-
-            if success == 1:
-                print "find viable solution\n"
-                break
-            
-            print "\n\n\ncurrent testing angle: ", angle, "\n" 
-
-            ###################################  pick motion  ###################################
-            
-            # pick orientation
-            pick_orientation = self.end_effector_orientation(pick_put_3D[0][0], pick_put_3D[0][1], angle)
-
-            # pick pose  
-            pick_end_effector_pose = np.eye(4)
-            pick_end_effector_pose[:3,:3] = copy.deepcopy(pick_orientation)
-
-            # leave some margin for gripper
-            pick_point = np.array([[pick_put_3D[0][0]],[pick_put_3D[0][1]],[pick_put_3D[0][2]]])
-            z_axis = np.array([[0.0],[0.0],[1.0]])
-            pick_end_effector_pose[:3,3:4] = pick_point - 5.0 * np.matmul(pick_orientation,z_axis)
-
-            if angles != np.pi/2:
-                pick_end_effector_pose[2,3] = pick_end_effector_pose[2,3] + 5.0
-
-            # pick preparation pose
-            pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
-            pick_prepare_pose[2][3] = 90.0
-            
-            # compute configuration for pick pose
-            pick_target_cfg = IK(pick_end_effector_pose, self.rexarm.angle_limits)
-
-            if pick_target_cfg == None:
-                continue
-
-            pick_target_cfg.append(0.0)
-
-            # compute configuration for pick preparation pose
-            pick_prepare_target_cfg = IK(pick_prepare_pose, self.rexarm.angle_limits)
-
-            if pick_prepare_target_cfg == None:
-                continue
-            
-            # make sure the configuration difference between pick pose and pick preparation pose is not large
-            difference = np.absolute(pick_prepare_target_cfg[0] - pick_target_cfg[0])
-
-            if difference > np.pi/2:
-                continue
-
-            pick_prepare_target_cfg.append(0.0)
-
-            # close gripper 
-            gripper_close = copy.deepcopy(pick_target_cfg)
-            gripper_close[6] = 2.65
-
-            # preparation pose before moving back
-            pick_prepare_target_cfg_back = copy.deepcopy(pick_prepare_target_cfg)
-            pick_prepare_target_cfg_back[6] = 2.65
-
-            # move back to origin
-            pick_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.65]
-
-
-            ###################################  put motion  ###################################
-
-            # put orientation
-            put_orientation = self.end_effector_orientation(pick_put_3D[1][0], pick_put_3D[1][1], angle)
-
-            # put pose  
-            put_end_effector_pose = np.eye(4)
-            put_end_effector_pose[:3,:3] = copy.deepcopy(put_orientation)
-
-            # leave some margin for gripper
-            put_point = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
-            z_axis = np.array([[0.0],[0.0],[1.0]])
-            put_end_effector_pose[:3,3:4] = put_point - 5.0 * np.matmul(put_orientation,z_axis)
-
-            if angles != np.pi/2:
-                put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 5.0
-
-            # put preparation pose
-            put_prepare_pose = copy.deepcopy(put_end_effector_pose)
-            put_prepare_pose[2][3] = 90.0
-            
-            # compute configuration for put pose
-            put_target_cfg = IK(put_end_effector_pose, self.rexarm.angle_limits)
-
-            if put_target_cfg == None:
-                continue
-
-            put_target_cfg.append(2.65)
-
-            # compute configuration for put preparation pose
-            put_prepare_target_cfg = IK(put_prepare_pose, self.rexarm.angle_limits)
-
-            if put_prepare_target_cfg == None:
-                continue
-            
-            # make sure the configuration difference between put pose and put preparation pose is not large
-            difference = np.absolute(put_prepare_target_cfg[0] - put_target_cfg[0])
-
-            if difference > np.pi/2:
-                continue
-
-            put_prepare_target_cfg.append(2.65)
-
-            # open gripper 
-            gripper_open = copy.deepcopy(put_target_cfg)
-            gripper_open[6] = 0.0
-
-            # preparation pose before moving back
-            put_prepare_target_cfg_back = copy.deepcopy(put_prepare_target_cfg)
-            put_prepare_target_cfg_back[6] = 0.0
-
-            # move back to origin
-            put_move_back = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-            success = 1
+        self.execute(pick6d=pick6d, put6d=put6d, directCall=False)
         
-        if success:
-            cfgs.append(pick_prepare_target_cfg)
-            cfgs.append(pick_target_cfg)
-            cfgs.append(gripper_close)
-            cfgs.append(pick_prepare_target_cfg_back)
-            cfgs.append(pick_move_back)
-            cfgs.append(put_prepare_target_cfg)
-            cfgs.append(put_target_cfg)
-            cfgs.append(gripper_open)
-            cfgs.append(put_prepare_target_cfg_back)
-            cfgs.append(put_move_back)
-            for cfg in cfgs:
-                plan_speeds, plan_angles = self.tp.generate_plan(cfg)
-                self.tp.execute_plan(plan_speeds, plan_angles)
-                self.rexarm.pause(1)
-        else:
-            print "can not execute\n"
+
+    def inPickLocation(self,block):
+        # TODO: check whether in the right part of the board
+        return block[0] >= 0
 
     def task1(self):
         self.current_state = "task1"
         print("Executing task1")
-        self.kinect.block_poses
+        block_poses = copy.deepcopy(self.kinect.get_block_poses())
+        print(block_poses)
+        right_flag = True
+        
+        put_location = np.array([-200,100,0,0,0,0])
+        while right_flag:
+            right_flag = False
+            for block in block_poses:
+                if not self.inPickLocation(block):
+                    put_location = block
+                else: 
+                    right_flag = True
+
+            for block in block_poses:
+                if self.inPickLocation(block):
+                    try:
+                        self.pick_put(block.copy(), put_location.copy())
+                        block_poses = copy.deepcopy(self.kinect.get_block_poses())
+                        break
+                    except:
+                        self.next_state = "idle"
+                        return
+    
         self.next_state = "idle"
         pass
 
