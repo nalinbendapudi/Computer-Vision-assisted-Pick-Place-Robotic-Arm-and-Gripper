@@ -128,29 +128,48 @@ def IK(pose, angle_limits):
             # get the orientation difference between the end effector of the first three joints and all six joints
             R_36 = np.matmul(R_03.T,R)
 
-            theta4 = np.arctan2(R_36[1][2], R_36[0][2])
+            v4_1 = np.arctan2(R_36[1][2], R_36[0][2])
 
-            theta6 = np.arctan2(R_36[2][1], -R_36[2][0])
+            if v4_1 > 0 and v4_1 <= np.pi:
+                v4_2 = v4_1 - np.pi
+            else:
+                v4_2 = v4_1 + np.pi
+                
+            v6_1 = np.arctan2(R_36[2][1], -R_36[2][0])
 
-            sin_theta5 = R_36[0][2]/np.cos(theta4)
+            if v6_1 > 0 and v6_1 <= np.pi:
+                v6_2 = v6_1 - np.pi
+            else:
+                v6_2 = v6_1 + np.pi
 
-            cos_theta5 = R_36[2][2]
+            # sin_theta5 = R_36[0][2]/np.cos(theta4)
 
-            theta5 = np.arctan2(sin_theta5, cos_theta5)
+            # cos_theta5 = R_36[2][2]
 
+            # theta5 = np.arctan2(sin_theta5, cos_theta5)
 
-            cfg = [theta1, theta2, theta3, theta4, theta5, theta6]
+            v5_1 = np.arctan2(R_36[0][2]/np.cos(v4_1), R_36[2][2])
 
-            viable = 1
+            v5_2 = np.arctan2(R_36[0][2]/np.cos(v4_2), R_36[2][2])
 
-            # check if the configuration exceed joint anlge limits
-            for i in range(len(cfg)) :
-                if cfg[i] < angle_limits[i,0] or cfg[i] > angle_limits[i,1]:
-                    viable = 0
-                    break
+            for k in [[v4_1, v5_1, v6_1],[v4_2, v5_2, v6_2]]:
+                theta4 = k[0]
+                theta5 = k[1]
+                theta6 = k[2]
 
-            if viable:
-                return cfg
+                cfg = [theta1, theta2, theta3, theta4, theta5, theta6]
+
+                viable = 1
+
+                # check if the configuration exceed joint anlge limits
+                for i in range(len(cfg)) :
+                    if cfg[i] < angle_limits[i,0] or cfg[i] > angle_limits[i,1]:
+                        
+                        viable = 0
+                        break
+
+                if viable:
+                    return cfg
                     
     return None
 

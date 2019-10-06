@@ -40,10 +40,10 @@ class TrajectoryPlanner():
         numberOfInterpolations = int(T/self.dt - 1)
         return cubicInterpolation(initial_wp, final_wp, 0.0, 0.0, T, numberOfInterpolations)
 
-    def generate_plan(self, waypoint):
+    def generate_plan(self, waypoint, max_speed):
         self.set_initial_wp()
         self.set_final_wp(waypoint)
-        total_time = self.calc_time_from_waypoints()
+        total_time = self.calc_time_from_waypoints(max_speed)
         plan_speeds = []
         plan_angles = []
 

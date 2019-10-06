@@ -193,9 +193,9 @@ class StateMachine():
             pick_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[0][0]],[pick_put_3D[0][1]],[pick_put_3D[0][2]]])
 
             if pick_end_effector_pose[2,3] < 35.0:
-                pick_end_effector_pose[2,3] = 40.0
+                pick_end_effector_pose[2,3] = 35.0
             else:
-                pick_end_effector_pose[2,3] = pick_end_effector_pose[2,3] + 20.0
+                pick_end_effector_pose[2,3] = pick_end_effector_pose[2,3] + 10.0
 
             # compute configuration for pick pose
             pick_target_cfg = IK(pick_end_effector_pose, self.rexarm.angle_limits)
@@ -214,7 +214,7 @@ class StateMachine():
                 pick_prepare_orientation = self.end_effector_orientation(pick_put_3D[0][0], pick_put_3D[0][1], pick_prepare_angle)
 
                 pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
-                pick_end_effector_pose[:3,:3] = copy.deepcopy(pick_prepare_orientation)
+                pick_prepare_pose[:3,:3] = copy.deepcopy(pick_prepare_orientation)
                 pick_prepare_pose[2,3] = pick_end_effector_pose[2,3] + 60.0
             
 
@@ -227,7 +227,7 @@ class StateMachine():
                 # make sure the configuration difference between pick pose and pick preparation pose is not large
                 pick_difference = [np.absolute(pick_prepare_target_cfg[i] - pick_target_cfg[i]) for i in range(len(pick_prepare_target_cfg))]
 
-                if max(pick_difference) > np.pi/2:
+                if max([pick_difference[1],pick_difference[2],pick_difference[4]]) > np.pi/2 or max([pick_difference[0],pick_difference[3],pick_difference[5]]) > np.pi/4:
                     continue
 
                 pick_prepare_target_cfg.append(0.0)
@@ -254,7 +254,7 @@ class StateMachine():
                 put_end_effector_pose[:3,:3] = copy.deepcopy(put_orientation)
                 put_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
 
-                if put_end_effector_pose[2,3] < 40.0:
+                if put_end_effector_pose[2,3] < 35.0:
                     put_end_effector_pose[2,3] = 45.0
                 else:
                     put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 50.0
@@ -278,12 +278,8 @@ class StateMachine():
                     put_prepare_orientation = self.end_effector_orientation(pick_put_3D[1][0], pick_put_3D[1][1], put_prepare_angle)
 
                     put_prepare_pose = copy.deepcopy(put_end_effector_pose)
-                    put_end_effector_pose[:3,:3] = copy.deepcopy(put_prepare_orientation)
-                    put_prepare_pose[2,3] = put_end_effector_pose[2,3] + 60.0
-
-                    put_prepare_pose = copy.deepcopy(put_end_effector_pose)
-                    put_prepare_pose[2][3] = put_end_effector_pose[2,3] + 70.0
-            
+                    put_prepare_pose[:3,:3] = copy.deepcopy(put_prepare_orientation)
+                    put_prepare_pose[2,3] = put_end_effector_pose[2,3] + 60.0            
 
                     # compute configuration for put preparation pose
                     put_prepare_target_cfg = IK(put_prepare_pose, self.rexarm.angle_limits)
@@ -294,7 +290,7 @@ class StateMachine():
                     # make sure the configuration difference between put pose and put preparation pose is not large
                     put_difference = [np.absolute(put_prepare_target_cfg[i] - put_target_cfg[i]) for i in range(len(put_prepare_target_cfg))]
 
-                    if max(put_difference) > np.pi/2:
+                    if max([put_difference[1],put_difference[2],put_difference[4]]) > np.pi/2 or max([put_difference[0],put_difference[3],put_difference[5]]) > np.pi/4:
                         continue
 
                     put_prepare_target_cfg.append(2.65)
@@ -324,17 +320,22 @@ class StateMachine():
             cfgs.append(put_prepare_target_cfg_back)
             cfgs.append(put_move_back)
             for i in range(len(cfgs)):
-                plan_speeds, plan_angles = self.tp.generate_plan(cfgs[i])
+                if i == 1 or i == 6:
+                    plan_speeds, plan_angles = self.tp.generate_plan(cfgs[i], 0.2)
+                else:
+                    plan_speeds, plan_angles = self.tp.generate_plan(cfgs[i], 0.5)
                 self.tp.execute_plan(plan_speeds, plan_angles)
                 self.rexarm.pause(1)
         else:
             print "can not execute\n"
-            raise NotImplementedError
+            # raise NotImplementedError
         if directCall:  
             self.next_state = "idle"
 
+        return success
+
     def pick_put(self, pick6d, put6d):
-        self.execute(pick6d=pick6d, put6d=put6d, directCall=False)
+        return self.execute(pick6d=pick6d, put6d=put6d, directCall=False)
         
 
     def inPickLocation(self,block):
@@ -351,21 +352,29 @@ class StateMachine():
         put_location = np.array([-200,100,0,0,0,0])
         while right_flag:
             right_flag = False
+            stack_height = 0.0
             for block in block_poses:
-                if not self.inPickLocation(block):
+                if not self.inPickLocation(block) and block[2] > stack_height:
                     put_location = block
+                    stack_height = block[2]
                 else: 
                     right_flag = True
 
             for block in block_poses:
                 if self.inPickLocation(block):
-                    try:
-                        self.pick_put(block.copy(), put_location.copy())
-                        block_poses = copy.deepcopy(self.kinect.get_block_poses())
+                    print "current block pose: ", block,"\n"
+                    success = self.pick_put(block.copy(), put_location.copy())
+                    if success:
                         break
-                    except:
-                        self.next_state = "idle"
-                        return
+
+            block_poses = copy.deepcopy(self.kinect.get_block_poses())
+                    # try:
+                    #     self.pick_put(block.copy(), put_location.copy())
+                    #     block_poses = copy.deepcopy(self.kinect.get_block_poses())
+                    #     break
+                    # except:
+                    #     self.next_state = "idle"
+                    #     return
     
         self.next_state = "idle"
         pass
