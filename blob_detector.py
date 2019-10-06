@@ -10,6 +10,44 @@ import scipy.ndimage.filters as fi
 from skimage.feature.peak import peak_local_max
 from copy import deepcopy
 
+# color_keys = ['Black', 'Red', 'Orange', 'Yellow', 'Green', 'Blue',  'Violet', 'Pink']
+# gt_color = [(0,0,0), (255,0,0), (255,69,0), (255,255,0), (0,255,0), (0,0,255), (148,0,211), (255,192,203)]
+colors_rgb = {'red': (255,0,0),
+          'green': (0,255,0),
+          'blue': (0,0,255),
+          'yellow': (255,255,0),
+          'orange': (255,127,0),
+          'black': (0,0,0),
+          'pink': (255,127,127),
+          'purple': (127,0,255),
+          'white': (255,255,255),}
+colors_hsv = {'red': (123,230,173),
+          'green': (57,58,195),
+          'blue': (9,168,161),
+          'yellow': (91,195,254),
+          'orange': (111,212,248),
+          'black': (163,33,107),
+          'pink': (131,136,254),
+          'purple': (160,94,176),
+          'white': (135,2,252),}
+
+colors_hsv = {'red':[[114, 232,133], [134, 252, 213]],
+              'green':[[ 40,  50, 138],[ 66,  80, 218]],
+              'blue':[[ -2, 157, 119], [ 18, 177, 199]],
+              'yellow': [[ 81, 183, 214], [101, 236, 294]],
+              'orange': [[102, 188, 210], [122, 228, 290]],
+              'black': [[150,  10,  63], [180,  50, 143]],
+              'pink': [[122, 134, 202], [142, 188, 294]],
+              'purple': [[146,  84,  93], [166, 104, 215]]}
+
+
+def hsv2name(c):
+    h, s, v = c
+    for k, ran in colors_hsv.items():
+        if h > ran[0][0] and h < ran[1][0]  and s > ran[0][1] and s < ran[1][1] and v > ran[0][2] and v < ran[1][2]:
+            return k
+    return 'white'
+
 def gkern2(kernlen=21, nsig=3):
     """Returns a 2D Gaussian kernel array."""
     # create nxn zeros
@@ -53,20 +91,24 @@ def detect(rgb, depth):
     kernlen = 6*nsig+1
     LoG = LoGkern2(kernlen, nsig)
     dest = cv2.filter2D(depth, ddepth=cv2.CV_64F,kernel = LoG)
-    coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=1, num_peaks=10)
+    coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=1, num_peaks=15)
     cnts = get_box(coordinates, 30)
     blobs = deepcopy(rgb)
     for c in coordinates:
-        cv2.circle(blobs, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=(0,255,0), thickness = 10)
-    # plt.subplot(221),plt.imshow(depth),plt.title('Input')
-    # plt.xticks([]), plt.yticks([])
-    # plt.subplot(222),plt.imshow(LoG),plt.title('LoG filter')
-    # plt.xticks([]), plt.yticks([])
-    # plt.subplot(223),plt.imshow(dest),plt.title('Response')
-    # plt.xticks([]), plt.yticks([])
-    # plt.subplot(224),plt.imshow(blobs),plt.title('Detection')
-    # plt.xticks([]), plt.yticks([])
-    # plt.show()
+        # cv2.circle(blobs, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=(153,110,175), thickness = 10)
+        name, _ = get_color(cv2.cvtColor(rgb, cv2.COLOR_BGR2HSV), c)
+        print(name, _)
+        cv2.circle(blobs, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=colors_rgb[name], thickness = 4)
+
+    plt.subplot(221),plt.imshow(depth),plt.title('Input')
+    plt.xticks([]), plt.yticks([])
+    plt.subplot(222),plt.imshow(cv2.cvtColor(rgb, cv2.COLOR_BGR2HSV)),plt.title('LoG filter')
+    plt.xticks([]), plt.yticks([])
+    plt.subplot(223),plt.imshow(dest),plt.title('Response')
+    plt.xticks([]), plt.yticks([])
+    plt.subplot(224),plt.imshow(blobs),plt.title('Detection')
+    plt.xticks([]), plt.yticks([])
+    plt.show()
 
     
 def plot_result(rgb, depth):
@@ -77,6 +119,15 @@ def plot_result(rgb, depth):
     f.colorbar(im2)
     ax2.set_title('depth')
     plt.show()
+
+def get_color(hsv, coordinates):
+    # import pdb;pdb.set_trace()
+    color = hsv[coordinates[0]][coordinates[1]]
+    # color = np.array(
+    #     (np.asscalar(np.int16(color[0])), np.asscalar(np.int16(color[1])), np.asscalar(np.int16(color[2]))))  # HERE
+    color = tuple([int(x) for x in color])
+    name = hsv2name(color)
+    return name, color
 
 if __name__=="__main__":
     rgb = np.load('rgb.npy')
@@ -90,12 +141,12 @@ if __name__=="__main__":
     height[height < 10] = 0
     height[height > 200] = 0
     # make blocks equal height
-    height[height > 20] = 40
+    # height[height > 20] = 40
     # Erosion
     kernel = np.ones((5,5),np.uint8)
     height = cv2.erode(height,kernel,iterations = 1)
 
-    opencv = True
+    opencv = False
 
     '''
     OpenCV contour methods
