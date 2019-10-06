@@ -74,16 +74,18 @@ def get_box(centers, len):
     return np.array(rtn)
 
 
-def detectBlob(depth):
+def detectBlob(rgb, depth):
     nsig = 8
     kernlen = 6*nsig+1
     LoG = LoGkern2(kernlen, nsig)
     dest = cv2.filter2D(depth, ddepth=cv2.CV_64F,kernel = LoG)
     coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=1, num_peaks=10)
     cnts = get_box(coordinates, 30)
-    # for c in coordinates:
-    #     cv2.circle(blobs, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=(0,255,0), thickness = 10)
-    return cnts, coordinates, nsig
+    names = []
+    for c in coordinates:
+        name, _ = get_color(cv2.cvtColor(rgb, cv2.COLOR_BGR2HSV), c)
+        names.append(name)
+    return cnts, coordinates, nsig, names
 
 
 def detect(rgb, depth):

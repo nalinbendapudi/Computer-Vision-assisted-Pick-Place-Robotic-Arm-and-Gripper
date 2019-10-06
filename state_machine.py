@@ -379,15 +379,140 @@ class StateMachine():
         self.next_state = "idle"
         pass
 
-    def task2(self):
+    def checkReachability(self, block_pose):
+        # Check whether the block pose is reachable in any pick_prepare_pose
+        angles = [i * np.pi / 20.0 for i in range(10, 21)]
+        for angle in angles:
+            # pick orientation
+            pick_orientation = self.end_effector_orientation(block_pose[0], block_pose[1], angle)
+
+            # pick pose
+            pick_end_effector_pose = np.eye(4)
+            pick_end_effector_pose[:3, :3] = copy.deepcopy(pick_orientation)
+            pick_end_effector_pose[:3, 3:4] = np.array([[block_pose[0]], [block_pose[1]], [block_pose[2]]])
+
+            if pick_end_effector_pose[2, 3] < 35.0:
+                pick_end_effector_pose[2, 3] = 35.0
+            else:
+                pick_end_effector_pose[2, 3] = pick_end_effector_pose[2, 3] + 10.0
+
+            # compute configuration for pick pose
+            pick_target_cfg = IK(pick_end_effector_pose, self.rexarm.angle_limits)
+            if pick_target_cfg is not None:
+                return True
+        return False
+
+    def prohibiedAreaTask2(self, x, y):
+        # if this is the left top area
+        if x < 0 and y > -40:
+            return True
+        return False
+
+    def tooClose(self,x,y,block_poses):
+        # check any block is within 40 mm which could cause collision
+        for block_pose in block_poses:
+            distance = np.sqrt((x - block_pose[0])**2 + (y-block_pose[1])**2)
+            if distance < 40:
+                return True
+        return False
+
+    def moveToValidRegion(self, move_target, block_poses):
+        # NOTE: X,Y are in the world frame
+        x_ranges = np.arange(-300, 300, 40)
+        y_ranges = np.arange(-300, 300, 40)
+        for x in x_ranges:
+            for y in y_ranges:
+                if self.prohibiedAreaTask2(x, y):
+                    continue
+                if self.tooClose(x,y,block_poses):
+                    continue
+                if not self.checkReachability([x,y,0,0,0,0]):
+                    continue
+                success = self.pick_put(move_target.copy(), [x,y,0,0,0,0])
+                if success:
+                    return True
+        return False
+
+    def moveAndSlideTask2(self, block_pose):
+        #TODO not fully implemented
+        return
+        # Phase 3, put block to left, push to up
+        initialPose = [-200, 40, 0,0,0,0]
+        finalPose = [-200, 120, 0, 0, 0, 0]
+        for i in range(100):
+            x = (finalPose[0] - initialPose[0])*i*1.0/99
+            y = (finalPose[1] - initialPose[1]) * i * 1.0 / 99
+            slide_pose = np.array([[0,-1,0,x], [-1,0,0,y],[0,0,-1,20], [0,0,0,1]])
+            slide_pose_cfg = IK(slide_pose, self.rexarm.angle_limits)
+            self.rexarm.set_positions(slide_pose_cfg)
+            self.rexarm.pause(.01)
+
+    def moveAndStackTask3(self, block_pose):
+        #TODO not fully implemented
+        pass
+
+    def task2(self, task3=False):
+        # FIXME: check opencv x,y order
         self.current_state = "task2"
-        print("Executing task1")
+        print("Executing task2")
+        # check reachability of world
+        valid_flag = True
+        for block_pose in block_poses:
+            if not self.checkReachability(block_pose):
+                print(block_pose, " cannot be reached")
+                valid_flag = False
+        if not valid_flag:
+            print("exiting task 2...")
+            self.next_state = 'idle'
+            return
+
+        # Phase 1, remove stacked blocks, remove blocks in the prohibited region
+        while True:
+            break_while_flag = True
+            blocks = copy.deepcopy(self.kinect.get_block_pose_color())
+            block_poses = blocks['poses']
+            for block_pose in block_poses:
+                if self.prohibiedAreaTask2(block_pose[0], block_pose[1]) or block_pose[2] > 50:
+                    if self.moveToValidRegion(block_pose, block_poses):
+                        break_while_flag = False
+                        break
+                    else:
+                        print("moveToValidRegion fails, exiting task2...")
+                        self.next_state = "idle"
+                        return
+            if break_while_flag:
+                break
+        # Phase 2, get color order, call move and slide
+        while True:
+            blocks = copy.deepcopy(self.kinect.get_block_pose_color())
+            block_poses = blocks['poses']
+            break_while_flag = True
+            for block_pose in block_poses:
+                if not self.prohibiedAreaTask2(block_pose[0], block_pose[1]):
+                    break_while_flag = False
+            if break_while_flag:
+                print("Done Task 2!")
+                break
+            orders = ['black', 'red',  'orange', 'yellow', 'green', 'blue', 'purple', 'pink']
+            for color_order in orders:
+                try:
+                    idx = blocks['color'].index(color_order)
+                except:
+                    print(color_order, ' not found!!')
+                    continue
+                if not self.prohibiedAreaTask2(block_poses[idx][0], block_poses[idx][1]):
+                    print("Trying to move ", color_order, " block at ", block_poses[idx])
+                    if task3:
+                        self.moveAndStackTask3(block_poses[idx])
+                    else:
+                        self.moveAndSlideTask2(block_poses[idx])
+                    break
         self.next_state = "idle"
         pass
 
     def task3(self):
         self.current_state = "task3"
-        print("Executing task1")
+        self.task2(task3 = True)
         self.next_state = "idle"
         pass
 

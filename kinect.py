@@ -204,18 +204,24 @@ class Kinect():
                 approx = cv2.approxPolyDP(cnt, 0.1*cv2.arcLength(cnt, True), True) 
                 valid_cnts.append(approx)
         else:
-            _, coordinates, nsig = bd.detectBlob(height)
-            for c in coordinates:
+            _, coordinates, nsig, names = bd.detectBlob(self.currentVideoFrame, height)
+            for c, name in zip(coordinates, names):
                 try:
                     p_w, z = self.sm.pixel2world(c[1], c[0])
                     if not self.check_valid_block(p_w, z):
                         continue
                 except:
                     continue
-                cv2.circle(self.currentVideoFrame, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=(100,0,0), thickness = 5)
+                cv2.circle(self.currentVideoFrame, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=bd.colors_rgb[name], thickness = 5)
                 block_poses.append(np.array([p_w[0][0], p_w[1][0], self.sm.z_reference - z, 0, 0, 0]).reshape(-1))
-        self.block_poses = block_poses
+        block = {}
+        block['poses'] = block_poses
+        block['colors'] = names
+        self.blocks = block.copy()
         # self.block_contours = valid_cnts
 
     def get_block_poses(self):
-        return copy.deepcopy(self.block_poses)
+        return copy.deepcopy(self.blocks['poses'])
+
+    def get_block_pose_color(self):
+        return copy.deepcopy(self.blocks)
