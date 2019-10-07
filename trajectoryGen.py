@@ -15,7 +15,8 @@ def cubicInterpolation (initialAngle, finalAngle, initialVelocity, finalVelocity
 	
 	M = np.array([[1,t_o,t_o**2,t_o**3], [0,1,2*t_o,3*t_o**2], [1,t_f,t_f**2,t_f**3], [0,1,2*t_f,3*t_f**2]])
 	b = np.array([q_o,v_o,q_f,v_f])
-	a = np.linalg.solve(M,b)
+	a = np.matmul(np.matmul(np.linalg.inv(np.matmul(M.T, M)), M.T),b)
+	# a = np.linalg.solve(M,b)
 	
 	angles = []
 	velocities = []

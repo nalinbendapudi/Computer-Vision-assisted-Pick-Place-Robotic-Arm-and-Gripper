@@ -205,6 +205,7 @@ class Kinect():
                 valid_cnts.append(approx)
         else:
             _, coordinates, nsig, names = bd.detectBlob(self.currentVideoFrame, height)
+            block_names = []
             for c, name in zip(coordinates, names):
                 try:
                     p_w, z = self.sm.pixel2world(c[1], c[0])
@@ -214,9 +215,10 @@ class Kinect():
                     continue
                 cv2.circle(self.currentVideoFrame, tuple(reversed(c)), int(nsig*np.sqrt(2)), color=bd.colors_rgb[name], thickness = 5)
                 block_poses.append(np.array([p_w[0][0], p_w[1][0], self.sm.z_reference - z, 0, 0, 0]).reshape(-1))
+                block_names.append(name)
         block = {}
         block['poses'] = block_poses
-        block['colors'] = names
+        block['colors'] = block_names
         self.blocks = block.copy()
         # self.block_contours = valid_cnts
 
