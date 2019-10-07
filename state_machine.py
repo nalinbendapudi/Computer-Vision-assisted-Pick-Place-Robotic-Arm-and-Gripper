@@ -195,6 +195,8 @@ class StateMachine():
             pick_end_effector_pose = np.eye(4)
             pick_end_effector_pose[:3,:3] = copy.deepcopy(pick_orientation)
             pick_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[0][0]],[pick_put_3D[0][1]],[pick_put_3D[0][2]]])
+            if angle < 2*np.pi/3:
+                pick_end_effector_pose[:3,3:4] = pick_end_effector_pose[:3,3:4] - 5.0 * np.matmul(pick_orientation,np.array([[0.0],[0.0],[1.0]])) 
 
             if pick_end_effector_pose[2,3] < 35.0:
                 pick_end_effector_pose[2,3] = 35.0
@@ -220,6 +222,8 @@ class StateMachine():
                 pick_prepare_pose = copy.deepcopy(pick_end_effector_pose)
                 pick_prepare_pose[:3,:3] = copy.deepcopy(pick_prepare_orientation)
                 pick_prepare_pose[2,3] = pick_end_effector_pose[2,3] + 60.0
+                if pick_prepare_angle < 2*np.pi/3:
+                    pick_prepare_pose[:3,3:4] = pick_prepare_pose[:3,3:4] - 5.0 * np.matmul(pick_prepare_orientation,np.array([[0.0],[0.0],[1.0]]))
             
 
                 # compute configuration for pick preparation pose
@@ -258,6 +262,9 @@ class StateMachine():
                 put_end_effector_pose[:3,:3] = copy.deepcopy(put_orientation)
                 put_end_effector_pose[:3,3:4] = np.array([[pick_put_3D[1][0]],[pick_put_3D[1][1]],[pick_put_3D[1][2]]])
 
+                if angle < 2*np.pi/3:
+                    put_end_effector_pose[:3,3:4] = put_end_effector_pose[:3,3:4] - 5.0 * np.matmul(put_orientation,np.array([[0.0],[0.0],[1.0]])) 
+
                 if put_end_effector_pose[2,3] < 35.0:
                     put_end_effector_pose[2,3] = 45.0
                 else:
@@ -285,7 +292,10 @@ class StateMachine():
 
                     put_prepare_pose = copy.deepcopy(put_end_effector_pose)
                     put_prepare_pose[:3,:3] = copy.deepcopy(put_prepare_orientation)
-                    put_prepare_pose[2,3] = put_end_effector_pose[2,3] + 60.0            
+                    put_prepare_pose[2,3] = put_end_effector_pose[2,3] + 60.0
+
+                    if put_prepare_angle < 2*np.pi/3:
+                        put_prepare_pose[:3,3:4] = put_prepare_pose[:3,3:4] - 5.0 * np.matmul(put_prepare_orientation,np.array([[0.0],[0.0],[1.0]]))          
 
                     # compute configuration for put preparation pose
                     put_prepare_target_cfg = IK(put_prepare_pose, self.rexarm.angle_limits)
@@ -429,11 +439,16 @@ class StateMachine():
             
         return False
 
-    def prohibiedAreaTask2(self, x, y):
+    def prohibiedAreaTask2(self, x, y, task3):
         # if this is the left top area
-        if x > 0 and y > 0:
-            return True
-        return False
+        if task3:
+            if x < 0 and y > -80:
+                return True
+            return False
+        else:
+            if x > 0 and y > 0:
+                return True
+            return False
 
     def tooClose(self,x,y,block_poses):
         # check any block is within 40 mm which could cause collision
@@ -443,13 +458,13 @@ class StateMachine():
                 return True
         return False
 
-    def moveToValidRegion(self, move_target, block_poses):
+    def moveToValidRegion(self, move_target, block_poses, task3):
         # NOTE: X,Y are in the world frame
         x_ranges = np.arange(-250, 250, 40)
         y_ranges = np.arange(-250, 250, 40)
         for x in x_ranges:
             for y in y_ranges:
-                if self.prohibiedAreaTask2(x, y):
+                if self.prohibiedAreaTask2(x, y, task3):
                     continue
                 if self.tooClose(x,y,block_poses):
                     continue
@@ -538,18 +553,23 @@ class StateMachine():
             self.rexarm.set_positions(slide_pose_cfg)
         # plan_speeds, plan_angles = self.tp.generate_plan(put_prepare_target_cfg, 0.5)
         # self.tp.execute_plan(plan_speeds, plan_angles)
-            self.rexarm.pause(0.1)
         
+        self.rexarm.pause(1)
+
+        plan_speeds, plan_angles = self.tp.generate_plan(put_prepare_target_cfg, 0.2)
+        self.tp.execute_plan(plan_speeds, plan_angles)
+        self.rexarm.pause(1)
+
         plan_speeds, plan_angles = self.tp.generate_plan([0.0]*7, 0.5)
         self.tp.execute_plan(plan_speeds, plan_angles)
         self.rexarm.pause(1)
         return True
 
 
-    def moveAndStackTask3(self, block_pose, block_poses):
+    def moveAndStackTask3(self, block_pose, block_poses, task3):
         stack_height = 0.0
         for block in block_poses:
-            if self.prohibiedAreaTask2(block[0], block[1]) and block[2] > stack_height:
+            if self.prohibiedAreaTask2(block[0], block[1], task3) and block[2] > stack_height:
                 stack_height = block[2]
         return self.pick_put(block_pose.copy(), [-200.0,  10.0, stack_height])
 
@@ -578,8 +598,8 @@ class StateMachine():
             blocks = copy.deepcopy(self.kinect.get_block_pose_color())
             block_poses = blocks['poses']
             for block_pose in block_poses:
-                if self.prohibiedAreaTask2(block_pose[0], block_pose[1]) or block_pose[2] > 50:
-                    if self.moveToValidRegion(block_pose, block_poses):
+                if self.prohibiedAreaTask2(block_pose[0], block_pose[1], task3) or block_pose[2] > 50:
+                    if self.moveToValidRegion(block_pose, block_poses, task3):
                         break_while_flag = False
                         break
                     else:
@@ -595,7 +615,7 @@ class StateMachine():
             block_poses = blocks['poses']
             break_while_flag = True
             for block_pose in block_poses:
-                if not self.prohibiedAreaTask2(block_pose[0], block_pose[1]):
+                if not self.prohibiedAreaTask2(block_pose[0], block_pose[1], task3):
                     break_while_flag = False
             if break_while_flag:
                 print("Done Task 2!")
@@ -609,17 +629,17 @@ class StateMachine():
                         print("looking for ", color_order)
                         break
                     continue
-                if not self.prohibiedAreaTask2(block_poses[idx][0], block_poses[idx][1]):
+                if not self.prohibiedAreaTask2(block_poses[idx][0], block_poses[idx][1], task3):
                     print("Trying to move ", color_order, " block at ", block_poses[idx])
                     
 
                     if task3:
-                        if self.moveAndStackTask3(block_poses[idx], block_poses):
+                        if self.moveAndStackTask3(block_poses[idx], block_poses, task3):
                             moved_block.append(color_order)
                         else:
-                            print("Error moving ", color_order, ". Existing...")
-                            self.next_state = "idle"
-                            return
+                            print("Error moving ", color_order)
+                            # self.next_state = "idle"
+                            break
                     else:
                         if self.moveAndSlideTask2(block_poses[idx]):
                             moved_block.append(color_order)
