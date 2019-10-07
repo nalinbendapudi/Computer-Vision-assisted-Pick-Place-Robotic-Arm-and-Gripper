@@ -176,6 +176,7 @@ class StateMachine():
 
         # try some end effector orientation in sequence, execute if a viable trajectory is found
         angles = [i*np.pi/20.0 for i in range(10,21)]
+        prepare_angles = [i*np.pi/20.0 for i in range(10,21)]
         success = 0
         cfgs = []
         for angle in angles:
@@ -212,7 +213,7 @@ class StateMachine():
             pick_target_cfg.append(0.0)
 
             # pick preparation pose
-            for pick_prepare_angle in angles:
+            for pick_prepare_angle in prepare_angles:
 
                 if success == 1:
                     break
@@ -268,7 +269,7 @@ class StateMachine():
                 if put_end_effector_pose[2,3] < 35.0:
                     put_end_effector_pose[2,3] = 45.0
                 else:
-                    put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 50.0
+                    put_end_effector_pose[2,3] = put_end_effector_pose[2,3] + 35.0
 
                 # compute configuration for put pose
                 put_target_cfg = IK(put_end_effector_pose, self.rexarm.angle_limits)
@@ -283,7 +284,7 @@ class StateMachine():
                 # print "put height: ", put_end_effector_pose[2,3], "\n"
 
                 # put preparation pose
-                for put_prepare_angle in angles:
+                for put_prepare_angle in prepare_angles:
 
                     if success == 1:
                         break
@@ -292,7 +293,7 @@ class StateMachine():
 
                     put_prepare_pose = copy.deepcopy(put_end_effector_pose)
                     put_prepare_pose[:3,:3] = copy.deepcopy(put_prepare_orientation)
-                    put_prepare_pose[2,3] = put_end_effector_pose[2,3] + 60.0
+                    put_prepare_pose[2,3] = put_end_effector_pose[2,3] + 45.0
 
                     if put_prepare_angle < 2*np.pi/3:
                         put_prepare_pose[:3,3:4] = put_prepare_pose[:3,3:4] - 5.0 * np.matmul(put_prepare_orientation,np.array([[0.0],[0.0],[1.0]]))          
@@ -446,7 +447,7 @@ class StateMachine():
                 return True
             return False
         else:
-            if x > 0 and y > 0:
+            if x > 0 and y > 0 or (x > -162 and x < 0 and y > 0 and y < 90):
                 return True
             return False
 
@@ -460,8 +461,15 @@ class StateMachine():
 
     def moveToValidRegion(self, move_target, block_poses, task3):
         # NOTE: X,Y are in the world frame
+        '''
+        #Task3
         x_ranges = np.arange(-250, 250, 40)
         y_ranges = np.arange(-250, 250, 40)
+        '''
+
+        x_ranges = np.arange(-150, 200, 40)
+        y_ranges = np.arange(-200, 200, 40)
+
         for x in x_ranges:
             for y in y_ranges:
                 if self.prohibiedAreaTask2(x, y, task3):
@@ -476,12 +484,33 @@ class StateMachine():
                     return True
         return False
 
-    def moveAndSlideTask2(self, block_pose):
+    def moveAndSlideTask2(self, block_pose, color):
         #TODO not fully implemented
-        self.pick_put(block_pose.copy(), [-0.0,  150.0, 0])
-        # Phase 3, put block to left, push to up
-        initialPose = [-60, 150.0, 40,0,0,0]
-        finalPose = [30, 150, 40, 0, 0, 0]
+        if color == 'black':
+            if not self.pick_put(block_pose.copy(), [-0.0,  150.0, 0]):
+                return False
+            # Phase 3, put block to left, push to up
+            initialPose = [-60, 150.0, 40,0,0,0]
+            finalPose = [10, 150, 40, 0, 0, 0]
+        elif color == 'purple':
+            if not self.pick_put(block_pose.copy(), [-0.0,  150.0, 0]):
+                return False
+            # Phase 3, put block to left, push to up
+            initialPose = [-60, 150.0, 40,0,0,0]
+            finalPose = [10, 150, 40, 0, 0, 0]
+        elif color == 'pink':
+            if not self.pick_put(block_pose.copy(), [-0.0,  150.0, 0]):
+                return False
+            # Phase 3, put block to left, push to up
+            initialPose = [-60, 150.0, 40,0,0,0]
+            finalPose = [-60, 150, 40, 0, 0, 0]
+        else:
+            if not self.pick_put(block_pose.copy(), [-0.0,  150.0, 0]):
+                return False
+            # Phase 3, put block to left, push to up
+            initialPose = [-60, 150.0, 40,0,0,0]
+            finalPose = [30, 150, 40, 0, 0, 0]
+
 
         success = False
 
@@ -518,10 +547,10 @@ class StateMachine():
                 if put_prepare_target_cfg == None:
                     continue
 
-                # make sure the configuration difference between put pose and put preparation pose is not large
-                put_difference = [np.absolute(put_prepare_target_cfg[i] - put_target_cfg[i]) for i in range(len(put_prepare_target_cfg))]
-                if max([put_difference[1],put_difference[2],put_difference[4]]) > np.pi/2 or max([put_difference[0],put_difference[3],put_difference[5]]) > np.pi/4:
-                    continue
+                # # make sure the configuration difference between put pose and put preparation pose is not large
+                # put_difference = [np.absolute(put_prepare_target_cfg[i] - put_target_cfg[i]) for i in range(len(put_prepare_target_cfg))]
+                # if max([put_difference[1],put_difference[2],put_difference[4]]) > np.pi/2 or max([put_difference[0],put_difference[3],put_difference[5]]) > np.pi/4:
+                #     continue
 
                 put_prepare_target_cfg.append(0.0)
 
@@ -571,7 +600,10 @@ class StateMachine():
         for block in block_poses:
             if self.prohibiedAreaTask2(block[0], block[1], task3) and block[2] > stack_height:
                 stack_height = block[2]
-        return self.pick_put(block_pose.copy(), [-200.0,  10.0, stack_height])
+        if stack_height < 1:
+            return self.pick_put(block_pose.copy(), [-220.0,  10.0, stack_height])
+        else:
+            return self.pick_put(block_pose.copy(), [-200.0,  10.0, stack_height])
 
     def task2(self, task3=False):
         # FIXME: check opencv x,y order
@@ -593,6 +625,7 @@ class StateMachine():
 
         # Phase 1, remove stacked blocks, remove blocks in the prohibited region
         print("Phase 1, remove stacked blocks, remove blocks in the prohibited region")
+        orange_moved = False
         while True:
             break_while_flag = True
             blocks = copy.deepcopy(self.kinect.get_block_pose_color())
@@ -606,6 +639,14 @@ class StateMachine():
                         print("moveToValidRegion fails, exiting task2...")
                         self.next_state = "idle"
                         return
+            if not task3:
+                if not orange_moved:
+                    try:
+                        idx = blocks['colors'].index('orange')
+                        if moveToValidRegion(block_poses[idx], block_poses, task3):
+                            orange_moved = True
+                    except:
+                        pass
             if break_while_flag:
                 break
         # Phase 2, get color order, call move and slide
@@ -641,12 +682,11 @@ class StateMachine():
                             # self.next_state = "idle"
                             break
                     else:
-                        if self.moveAndSlideTask2(block_poses[idx]):
+                        if self.moveAndSlideTask2(block_poses[idx], color_order):
                             moved_block.append(color_order)
                         else:
-                            print("Error moving ", color_order, ". Existing...")
-                            self.next_state = "idle"
-                            return
+                            print("Error moving ", color_order)
+                            break
                     break
         self.next_state = "idle"
         pass

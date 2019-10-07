@@ -179,8 +179,8 @@ class Kinect():
         depth = cv2.GaussianBlur(self.currentDepthFrame, (5, 5), 0)
         height = self.z_reference - (0.1236 * np.tan(depth/2842.5 + 1.1863)*1000)
         # Filter out outliers
-        height[height < 10] = 0
-        height[height > 200] = 0
+        height[height < 15] = 0
+        height[height > 400] = 0
         # make blocks equal height
         # height[height > 20] = 40
         # Erosion
