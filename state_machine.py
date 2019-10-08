@@ -2,6 +2,7 @@ import time
 import numpy as np
 import copy
 from kinematics import *
+import csv
 
 """
 TODO: Add states and state functions to this class
@@ -54,6 +55,8 @@ class StateMachine():
                 self.task2()
             if (self.next_state == "task3"):
                 self.task3()
+            if (self.next_state == "task4"):
+                self.collect_data_for_trajectory(0.8, False)
                 
         if(self.current_state == "estop"):
             self.next_state = "estop"
@@ -142,6 +145,89 @@ class StateMachine():
         orientation = np.matmul(R_z, R_x)
 
         return orientation
+
+
+    def record_planned_trajectory(self, plan_speeds, plan_angles, plan_poses):
+        with open('plan_speeds.csv', 'wb') as csvfile:
+                writer = csv.writer(csvfile, delimiter=',')
+                for i in range(np.shape(plan_speeds)[0]):
+                    writer.writerow(plan_speeds[i,:])
+
+        with open('plan_angles.csv', 'wb') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',')
+            for i in range(np.shape(plan_angles)[0]):
+                writer.writerow(plan_angles[i,:])
+
+        with open('plan_poses.csv', 'wb') as csvfile:
+            writer = csv.writer(csvfile, delimiter=',')
+            for i in range(np.shape(plan_poses)[0]):
+                writer.writerow(plan_poses[i,:])
+            
+
+    def collect_data_for_trajectory(self, max_speed, need_plan):
+        print "start collecting data for trajectory"
+        poses = np.array([[120.0,45.0,60.0,100.0,80.0,50.0,0.0],[0.0,0.0,0.0,0.0,0.0,0.0,0.0]])*3.141592/180.0
+        print poses[0,:]
+
+        if need_plan:
+            print "with planning"
+            plan_speeds, plan_angles = self.tp.generate_plan(poses[0,:], max_speed)
+            plan_poses = np.zeros((np.shape(plan_angles)[0],16))
+            for j in range(np.shape(plan_angles)[0]):
+                plan_poses[j,:] = np.reshape(get_transformation(plan_angles[j,:]),-1)
+
+            self.record_planned_trajectory(plan_speeds, plan_angles, plan_poses)
+
+            self.tp.execute_plan(plan_speeds, plan_angles)
+
+            self.rexarm.pause(1)
+            
+            # go back
+            back_speeds, back_angles = self.tp.generate_plan(poses[1,:], max_speed)
+            self.tp.execute_plan(back_speeds, back_angles)
+        else:
+            print "without planning"
+            speeds = np.absolute(poses[0,:]) * max_speed / max(np.absolute(poses[0,:]))
+            print "speeds: ",speeds
+            self.rexarm.set_speeds_normalized(speeds)
+            self.rexarm.set_positions(poses[0,:])
+            
+            # record joint angles every 0.05 seconds
+            exact_angles = []
+            start = time.clock()
+            last = start
+            while time.clock() - start < 2.0:
+                if time.clock() - last >= 0.049996:
+                    angle = self.rexarm.get_positions()
+                    exact_angles.append(copy.deepcopy(angle))
+                    interval = time.clock() - last
+                    last = time.clock()
+            
+            # compute exact end effector poses
+            exact_poses = []
+            for angle in exact_angles:
+                exact_poses.append(np.reshape(get_transformation(angle),-1))
+            
+            # record them to csv files
+            with open('exact_angles.csv', 'wb') as csvfile:
+                writer = csv.writer(csvfile, delimiter=',')
+                for row in exact_angles:
+                    writer.writerow(row)
+
+            with open('exact_poses.csv', 'wb') as csvfile:
+                writer = csv.writer(csvfile, delimiter=',')
+                for row in exact_poses:
+                    writer.writerow(row)
+                
+            # go back
+            self.rexarm.pause(1)
+            self.rexarm.set_speeds_normalized(speeds)
+            self.rexarm.set_positions(poses[1,:])
+            
+        
+        
+        self.next_state = "idle"
+            
 
     """Functions run for each state"""
     def execute(self, pick6d = np.array([200,0,50,0,0,0]), put6d=np.array([200,0,50,0,0,0]), directCall = True):
@@ -343,7 +429,7 @@ class StateMachine():
                 if i == 1 or i == 6:
                     plan_speeds, plan_angles = self.tp.generate_plan(cfgs[i], 0.2)
                 else:
-                    plan_speeds, plan_angles = self.tp.generate_plan(cfgs[i], 0.5)
+                    plan_speeds, plan_angles = self.tp.generate_plan(cfgs[i], 0.3)
                 self.tp.execute_plan(plan_speeds, plan_angles)
                 self.rexarm.pause(1)
         else:
@@ -447,7 +533,7 @@ class StateMachine():
                 return True
             return False
         else:
-            if x > 0 and y > 0 or (x > -162 and x < 0 and y > 0 and y < 90):
+            if x > 0 and y > 0 or (x > -162 and x < -50 and y > 0 and y < 90):
                 return True
             return False
 
@@ -626,6 +712,7 @@ class StateMachine():
         # Phase 1, remove stacked blocks, remove blocks in the prohibited region
         print("Phase 1, remove stacked blocks, remove blocks in the prohibited region")
         orange_moved = False
+        blue_moved = False
         while True:
             break_while_flag = True
             blocks = copy.deepcopy(self.kinect.get_block_pose_color())
@@ -645,6 +732,14 @@ class StateMachine():
                         idx = blocks['colors'].index('orange')
                         if moveToValidRegion(block_poses[idx], block_poses, task3):
                             orange_moved = True
+                    except:
+                        pass
+                
+                if not blue_moved:
+                    try:
+                        idx = blocks['colors'].index('blue')
+                        if moveToValidRegion(block_poses[idx], block_poses, task3):
+                            blue_moved = True
                     except:
                         pass
             if break_while_flag:

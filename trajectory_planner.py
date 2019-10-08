@@ -34,7 +34,7 @@ class TrajectoryPlanner():
 
     def calc_time_from_waypoints(self, max_speed = 0.5):
         # Returns min time given initial wp, final wp and max speed
-        return max(np.absolute(np.array(self.final_wp) - np.array(self.initial_wp)))/max_speed
+        return max(np.absolute(np.array(self.final_wp) - np.array(self.initial_wp)))/(0.67*max_speed)
 
     def generate_cubic_spline(self, T, initial_wp, final_wp):
         numberOfInterpolations = int(T/self.dt - 1)
