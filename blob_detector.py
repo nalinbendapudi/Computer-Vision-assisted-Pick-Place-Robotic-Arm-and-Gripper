@@ -38,7 +38,7 @@ colors_hsv = {'red':[[110, 146,118], [134, 210, 200]],
               'orange': [[108, 87, 206], [122, 201, 294]],
               'black': [[129,  0,  41], [160,  61, 166]],
               'pink': [[122, 79, 202], [142, 188, 294]],
-              'purple': [[146,  70,  93], [170, 104, 175]]}
+              'purple': [[146,  70,  93], [170, 123, 228]]}
 
 
 def hsv2name(c):
@@ -79,7 +79,7 @@ def detectBlob(rgb, depth):
     kernlen = 6*nsig+1
     LoG = LoGkern2(kernlen, nsig)
     dest = cv2.filter2D(depth, ddepth=cv2.CV_64F,kernel = LoG)
-    coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=1, num_peaks=10)
+    coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=0.5, num_peaks=50)
     cnts = get_box(coordinates, 30)
     names = []
     for c in coordinates:
@@ -93,7 +93,7 @@ def detect(rgb, depth):
     kernlen = 6*nsig+1
     LoG = LoGkern2(kernlen, nsig)
     dest = cv2.filter2D(depth, ddepth=cv2.CV_64F,kernel = LoG)
-    coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=1, num_peaks=15)
+    coordinates = peak_local_max(-dest, min_distance=10,threshold_abs=0.5, num_peaks=50)
     cnts = get_box(coordinates, 30)
     blobs = deepcopy(rgb)
     for c in coordinates:

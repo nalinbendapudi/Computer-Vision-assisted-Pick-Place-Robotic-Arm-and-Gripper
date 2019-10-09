@@ -3,6 +3,8 @@ import numpy as np
 import copy
 from kinematics import *
 import csv
+import cv2
+import blob_detector as bd
 
 """
 TODO: Add states and state functions to this class
@@ -19,6 +21,7 @@ class StateMachine():
         self.intrinsic = np.eye(3)
         self.cam2world = np.array([[1, 0, 0],[0, 1, 0]])
         self.z_reference = self.kinect.z_reference
+        self.count = None
 
     def set_next_state(self, state):
         self.next_state = state
@@ -692,6 +695,32 @@ class StateMachine():
             return self.pick_put(block_pose.copy(), [-200.0,  10.0, stack_height])
 
     def task2(self, task3=False):
+        '''
+        # This block is for collecting data for the report.
+        if self.count == None:
+            self.count = 0
+        else:
+            self.count += 1
+        self.current_state = "task2"
+        print("Executing task2")
+        # check reachability of world
+        print("check reachability of world")
+        valid_flag = True
+        blocks = copy.deepcopy(self.kinect.get_block_pose_color())
+        bgr = copy.deepcopy(self.kinect.currentVideoFrame)
+        
+        for pos, color, c in zip(blocks['poses'],blocks['colors'], blocks['block_cam_poses']):
+            print(color, pos)
+            cv2.circle(bgr, tuple(reversed(c)), int(8*np.sqrt(2)), color=bd.colors_rgb[color], thickness = 5)
+
+        cv2.imwrite('report/block_detection/{}.png'.format(self.count),cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+        np.save('report/block_detection/{}.npy'.format(self.count), blocks)
+        self.next_state = "idle"
+        return
+        '''
+
+        
+
         # FIXME: check opencv x,y order
         self.current_state = "task2"
         print("Executing task2")
